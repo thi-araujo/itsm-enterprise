@@ -74,7 +74,7 @@ def ticket_create(request):
             ticket.save()
 
             try:
-                from notifications.email import notify_ticket_created
+                from apps.notifications.email import notify_ticket_created
                 notify_ticket_created(ticket)
             except Exception:
                 pass
@@ -109,7 +109,7 @@ def ticket_update_status(request, pk):
         if form.is_valid():
             form.save()
             try:
-                from notifications.email import notify_ticket_assigned, notify_ticket_resolved
+                from apps.notifications.email import notify_ticket_assigned, notify_ticket_resolved
                 if updated.assignee:
                     notify_ticket_assigned(updated)
                 if updated.status == 'resolved':
@@ -131,7 +131,7 @@ def add_comment(request, pk):
             comment.author = request.user
             comment.save()
             try:
-                from notifications.email import notify_comment_added
+                from apps.notifications.email import notify_comment_added
                 notify_comment_added(comment)
             except Exception:
                 pass

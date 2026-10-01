@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from tickets.models import Ticket
+from apps.tickets.models import Ticket
 
 
 @login_required

@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from tickets.models import Ticket
-from notifications.email import notify_sla_breach
+from apps.tickets.models import Ticket
+from apps.notifications.email import notify_sla_breach
 
 
 class Command(BaseCommand):

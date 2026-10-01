@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from cmdb.models import Asset
+from apps.cmdb.models import Asset
 
 
 class Category(models.Model):

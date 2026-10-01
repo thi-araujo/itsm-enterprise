@@ -9,7 +9,7 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 
-from tickets.models import Ticket
+from apps.tickets.models import Ticket
 
 
 @login_required

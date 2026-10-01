@@ -27,12 +27,12 @@ INSTALLED_APPS = [
 
     'django_htmx',
 
-    'accounts',
-    'tickets',
-    'cmdb',
-    'notifications',
-    'reports',
-    'dashboard',
+    'apps.accounts.apps.AccountsConfig',
+    'apps.tickets.apps.TicketsConfig',
+    'apps.cmdb.apps.CmdbConfig',
+    'apps.notifications.apps.NotificationsConfig',
+    'apps.reports.apps.ReportsConfig',
+    'apps.dashboard.apps.DashboardConfig',
 ]
 
 MIDDLEWARE = [

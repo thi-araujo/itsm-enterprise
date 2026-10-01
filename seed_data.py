@@ -7,7 +7,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'itsm_project.settings')
 django.setup()
 
 from django.contrib.auth.models import User
-from tickets.models import Category, Ticket
+from apps.tickets.models import Category, Ticket
 
 # Superuser
 if not User.objects.filter(username='admin').exists():

@@ -8,12 +8,12 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('', include('dashboard.urls')),
-    path('accounts/', include('accounts.urls')),
-    path('tickets/', include('tickets.urls')),
-    path('cmdb/', include('cmdb.urls')),
-    path('notifications/', include('notifications.urls')),
-    path('reports/', include('reports.urls')),
+    path('', include('apps.dashboard.urls')),
+    path('accounts/', include('apps.accounts.urls')),
+    path('tickets/', include('apps.tickets.urls')),
+    path('cmdb/', include('apps.cmdb.urls')),
+    path('notifications/', include('apps.notifications.urls')),
+    path('reports/', include('apps.reports.urls')),
 ]
 
 if settings.DEBUG:
