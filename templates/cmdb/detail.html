@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ asset.name }} — CMDB — ITSM PRO{% endblock %}
 {% block breadcrumb %}
-<a href="{% url 'cmdb:list' %}" style="color:var(--raven-muted);text-decoration:none;">CMDB</a>
+<a href="{% url 'cmdb:list' %}" style="color:var(--itsm-muted);text-decoration:none;">CMDB</a>
 <i class="bi bi-chevron-right mx-1" style="font-size:.7rem;"></i>
 {{ asset.asset_tag }}
 {% endblock %}
@@ -11,7 +11,7 @@
   <div class="col-lg-7">
 
     <!-- Info principal -->
-    <div class="raven-card mb-3" style="padding:1.5rem;">
+    <div class="itsm-card mb-3" style="padding:1.5rem;">
       <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
           <span class="ticket-id me-2">{{ asset.asset_tag }}</span>
@@ -31,7 +31,7 @@
 
       <h4 style="font-weight:700;margin-bottom:.5rem;">{{ asset.name }}</h4>
       {% if asset.asset_type %}
-      <p style="color:var(--raven-muted);font-size:.85rem;margin-bottom:1.25rem;">
+      <p style="color:var(--itsm-muted);font-size:.85rem;margin-bottom:1.25rem;">
         <i class="{{ asset.asset_type.icon }} me-1"></i>{{ asset.asset_type.name }}
       </p>
       {% endif %}
@@ -39,61 +39,61 @@
       <div class="row g-3" style="font-size:.85rem;">
         {% if asset.brand %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Fabricante</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Fabricante</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.brand }}</div>
         </div>
         {% endif %}
         {% if asset.model %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Modelo</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Modelo</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.model }}</div>
         </div>
         {% endif %}
         {% if asset.serial %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Nº de Série</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Nº de Série</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.serial }}</div>
         </div>
         {% endif %}
         {% if asset.ip_address %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Endereço IP</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Endereço IP</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.ip_address }}</div>
         </div>
         {% endif %}
         {% if asset.mac_address %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">MAC Address</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">MAC Address</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.mac_address }}</div>
         </div>
         {% endif %}
         {% if asset.location %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Localização</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Localização</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.location }}</div>
         </div>
         {% endif %}
         {% if asset.department %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Departamento</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Departamento</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.department }}</div>
         </div>
         {% endif %}
         {% if asset.owner %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Responsável</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Responsável</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.owner.get_full_name|default:asset.owner.username }}</div>
         </div>
         {% endif %}
         {% if asset.purchase_date %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Data de Compra</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Data de Compra</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.purchase_date|date:"d/m/Y" }}</div>
         </div>
         {% endif %}
         {% if asset.warranty_expiry %}
         <div class="col-6">
-          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Garantia até</div>
+          <div style="color:var(--itsm-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Garantia até</div>
           <div style="font-weight:500;margin-top:.2rem;">{{ asset.warranty_expiry|date:"d/m/Y" }}</div>
         </div>
         {% endif %}
@@ -107,18 +107,18 @@
     </div>
 
     <!-- Tickets vinculados -->
-    <div class="raven-card">
-      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;justify-content:space-between;align-items:center;">
+    <div class="itsm-card">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:600;font-size:.9rem;">
-          <i class="bi bi-ticket-perforated me-2" style="color:var(--raven-accent);"></i>
+          <i class="bi bi-ticket-perforated me-2" style="color:var(--itsm-accent);"></i>
           Chamados Vinculados
         </span>
-        <a href="{% url 'tickets:create' %}" style="font-size:.8rem;color:var(--raven-accent);text-decoration:none;">
+        <a href="{% url 'tickets:create' %}" style="font-size:.8rem;color:var(--itsm-accent);text-decoration:none;">
           <i class="bi bi-plus me-1"></i>Abrir chamado
         </a>
       </div>
       <div style="overflow-x:auto;">
-        <table class="table raven-table mb-0">
+        <table class="table itsm-table mb-0">
           <thead><tr><th>ID</th><th>Título</th><th>Prioridade</th><th>Status</th><th>Data</th></tr></thead>
           <tbody>
           {% for t in tickets %}
@@ -126,12 +126,12 @@
             <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">#{{ t.pk|stringformat:"04d" }}</a></td>
             <td style="font-size:.85rem;">{{ t.title|truncatechars:45 }}</td>
             <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
-            <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
-            <td style="font-size:.78rem;color:var(--raven-muted);">{{ t.created_at|date:"d/m/Y" }}</td>
+            <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--itsm-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+            <td style="font-size:.78rem;color:var(--itsm-muted);">{{ t.created_at|date:"d/m/Y" }}</td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" style="text-align:center;color:var(--raven-muted);padding:1.5rem;font-size:.85rem;">
+            <td colspan="5" style="text-align:center;color:var(--itsm-muted);padding:1.5rem;font-size:.85rem;">
               Nenhum chamado vinculado a este ativo.
             </td>
           </tr>

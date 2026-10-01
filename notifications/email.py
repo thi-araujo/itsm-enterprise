@@ -23,13 +23,13 @@ def _send_email(subject, body, recipients):
             fail_silently=True,
         )
     except Exception as e:
-        print(f"[RAVEN EMAIL] Erro: {e}")
+        print(f"[ITSM EMAIL] Erro: {e}")
 
 
 def notify_ticket_created(ticket):
     admins = User.objects.filter(is_staff=True).exclude(email='')
     emails = list(admins.values_list('email', flat=True))
-    subject = f"[RAVEN] Novo Ticket #{ticket.pk:04d} — {ticket.get_priority_display()}"
+    subject = f"[ITSM Enterprise] Novo Ticket #{ticket.pk:04d} — {ticket.get_priority_display()}"
     body = (
         f"Um novo ticket foi aberto.\n\n"
         f"  ID:          #{ticket.pk:04d}\n"
@@ -40,7 +40,7 @@ def notify_ticket_created(ticket):
         f"  SLA:         {ticket.sla_deadline.strftime('%d/%m/%Y %H:%M') if ticket.sla_deadline else '—'}\n\n"
         f"Descrição:\n{ticket.description}\n\n"
         f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
-        f"— RAVEN ITSM"
+        f"— ITSM Enterprise"
     )
     _send_email(subject, body, emails)
     for admin in User.objects.filter(is_staff=True):
@@ -54,7 +54,7 @@ def notify_ticket_created(ticket):
 def notify_ticket_assigned(ticket):
     if not ticket.assignee:
         return
-    subject = f"[RAVEN] Ticket #{ticket.pk:04d} atribuído a você"
+    subject = f"[ITSM Enterprise] Ticket #{ticket.pk:04d} atribuído a você"
     body = (
         f"Olá, {ticket.assignee.get_full_name() or ticket.assignee.username}!\n\n"
         f"O ticket abaixo foi atribuído a você:\n\n"
@@ -63,7 +63,7 @@ def notify_ticket_assigned(ticket):
         f"  Prioridade: {ticket.get_priority_display()}\n"
         f"  SLA:        {ticket.sla_deadline.strftime('%d/%m/%Y %H:%M') if ticket.sla_deadline else '—'}\n\n"
         f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
-        f"— RAVEN ITSM"
+        f"— ITSM Enterprise"
     )
     emails = [ticket.assignee.email] if ticket.assignee.email else []
     _send_email(subject, body, emails)
@@ -75,14 +75,14 @@ def notify_ticket_assigned(ticket):
 
 
 def notify_ticket_resolved(ticket):
-    subject = f"[RAVEN] Ticket #{ticket.pk:04d} resolvido"
+    subject = f"[ITSM Enterprise] Ticket #{ticket.pk:04d} resolvido"
     body = (
         f"Olá, {ticket.requester.get_full_name() or ticket.requester.username}!\n\n"
         f"Seu chamado foi resolvido.\n\n"
         f"  ID:     #{ticket.pk:04d}\n"
         f"  Título: {ticket.title}\n\n"
         f"Acesse para confirmar: http://localhost:8000/tickets/{ticket.pk}/\n\n"
-        f"— RAVEN ITSM"
+        f"— ITSM Enterprise"
     )
     emails = [ticket.requester.email] if ticket.requester.email else []
     _send_email(subject, body, emails)
@@ -103,12 +103,12 @@ def notify_comment_added(comment):
     if ticket.assignee and ticket.assignee != comment.author:
         notify_users.add(ticket.assignee)
 
-    subject = f"[RAVEN] Novo comentário no Ticket #{ticket.pk:04d}"
+    subject = f"[ITSM Enterprise] Novo comentário no Ticket #{ticket.pk:04d}"
     body = (
         f"{comment.author.get_full_name() or comment.author.username} comentou:\n\n"
         f"\"{comment.content[:300]}\"\n\n"
         f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
-        f"— RAVEN ITSM"
+        f"— ITSM Enterprise"
     )
     emails = [u.email for u in notify_users if u.email]
     _send_email(subject, body, emails)
@@ -127,7 +127,7 @@ def notify_sla_breach(ticket):
     if ticket.assignee and ticket.assignee not in notify_users:
         notify_users.append(ticket.assignee)
 
-    subject = f"[RAVEN] ⚠️ SLA VENCIDO — Ticket #{ticket.pk:04d}"
+    subject = f"[ITSM Enterprise] ⚠️ SLA VENCIDO — Ticket #{ticket.pk:04d}"
     body = (
         f"ATENÇÃO: O prazo de SLA foi ultrapassado.\n\n"
         f"  ID:          #{ticket.pk:04d}\n"
@@ -137,7 +137,7 @@ def notify_sla_breach(ticket):
         f"  Responsável: {ticket.assignee.username if ticket.assignee else 'Não atribuído'}\n\n"
         f"Ação imediata necessária!\n"
         f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
-        f"— RAVEN ITSM"
+        f"— ITSM Enterprise"
     )
     emails = [u.email for u in notify_users if u.email]
     _send_email(subject, body, emails)

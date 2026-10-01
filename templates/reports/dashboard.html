@@ -9,13 +9,13 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 style="font-weight:700;margin-bottom:.25rem;">Central de Relatórios</h4>
-    <p style="color:var(--raven-muted);font-size:.85rem;margin:0;">Últimos {{ days }} dias</p>
+    <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">Últimos {{ days }} dias</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    <a href="?days=7"  class="btn btn-sm {% if days == 7  %}btn-raven{% else %}btn-outline-secondary{% endif %}">7d</a>
-    <a href="?days=30" class="btn btn-sm {% if days == 30 %}btn-raven{% else %}btn-outline-secondary{% endif %}">30d</a>
-    <a href="?days=60" class="btn btn-sm {% if days == 60 %}btn-raven{% else %}btn-outline-secondary{% endif %}">60d</a>
-    <a href="?days=90" class="btn btn-sm {% if days == 90 %}btn-raven{% else %}btn-outline-secondary{% endif %}">90d</a>
+    <a href="?days=7"  class="btn btn-sm {% if days == 7  %}btn-itsm{% else %}btn-outline-secondary{% endif %}">7d</a>
+    <a href="?days=30" class="btn btn-sm {% if days == 30 %}btn-itsm{% else %}btn-outline-secondary{% endif %}">30d</a>
+    <a href="?days=60" class="btn btn-sm {% if days == 60 %}btn-itsm{% else %}btn-outline-secondary{% endif %}">60d</a>
+    <a href="?days=90" class="btn btn-sm {% if days == 90 %}btn-itsm{% else %}btn-outline-secondary{% endif %}">90d</a>
     <a href="{% url 'reports:technician' %}?days={{ days }}"
        class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-person-lines-fill me-1"></i>Por Técnico
@@ -27,21 +27,21 @@
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--raven-accent);">{{ total }}</div>
+      <div class="stat-value" style="color:var(--itsm-accent);">{{ total }}</div>
       <div class="stat-label">Total de Tickets</div>
       <i class="bi bi-collection stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--raven-success);">{{ resolved }}</div>
+      <div class="stat-value" style="color:var(--itsm-success);">{{ resolved }}</div>
       <div class="stat-label">Resolvidos</div>
       <i class="bi bi-check-circle stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-card">
-      <div class="stat-value" style="color:{% if sla_pct >= 80 %}var(--raven-success){% elif sla_pct >= 60 %}var(--raven-warning){% else %}var(--raven-danger){% endif %};">
+      <div class="stat-value" style="color:{% if sla_pct >= 80 %}var(--itsm-success){% elif sla_pct >= 60 %}var(--itsm-warning){% else %}var(--itsm-danger){% endif %};">
         {{ sla_pct }}%
       </div>
       <div class="stat-label">SLA Cumprido</div>
@@ -50,7 +50,7 @@
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--raven-danger);">{{ breached_open }}</div>
+      <div class="stat-value" style="color:var(--itsm-danger);">{{ breached_open }}</div>
       <div class="stat-label">SLA Vencido Aberto</div>
       <i class="bi bi-alarm stat-icon"></i>
     </div>
@@ -60,17 +60,17 @@
 <!-- Gráficos linha 1 -->
 <div class="row g-3 mb-3">
   <div class="col-lg-8">
-    <div class="raven-card" style="padding:1.25rem;">
+    <div class="itsm-card" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
-        <i class="bi bi-graph-up me-2" style="color:var(--raven-accent);"></i>Volume Diário de Tickets
+        <i class="bi bi-graph-up me-2" style="color:var(--itsm-accent);"></i>Volume Diário de Tickets
       </div>
       <canvas id="chartDaily" height="100"></canvas>
     </div>
   </div>
   <div class="col-lg-4">
-    <div class="raven-card" style="padding:1.25rem;">
+    <div class="itsm-card" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
-        <i class="bi bi-pie-chart me-2" style="color:var(--raven-accent);"></i>Por Prioridade
+        <i class="bi bi-pie-chart me-2" style="color:var(--itsm-accent);"></i>Por Prioridade
       </div>
       <canvas id="chartPriority" height="160"></canvas>
     </div>
@@ -80,17 +80,17 @@
 <!-- Gráficos linha 2 -->
 <div class="row g-3 mb-3">
   <div class="col-lg-6">
-    <div class="raven-card" style="padding:1.25rem;">
+    <div class="itsm-card" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
-        <i class="bi bi-bar-chart me-2" style="color:var(--raven-accent);"></i>Por Categoria
+        <i class="bi bi-bar-chart me-2" style="color:var(--itsm-accent);"></i>Por Categoria
       </div>
       <canvas id="chartCategory" height="150"></canvas>
     </div>
   </div>
   <div class="col-lg-6">
-    <div class="raven-card" style="padding:1.25rem;">
+    <div class="itsm-card" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
-        <i class="bi bi-pie-chart me-2" style="color:var(--raven-accent);"></i>Por Status
+        <i class="bi bi-pie-chart me-2" style="color:var(--itsm-accent);"></i>Por Status
       </div>
       <canvas id="chartStatus" height="150"></canvas>
     </div>
@@ -99,14 +99,14 @@
 
 <!-- Top técnicos -->
 {% if by_tech %}
-<div class="raven-card mb-3">
-  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);">
+<div class="itsm-card mb-3">
+  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);">
     <span style="font-weight:600;font-size:.9rem;">
-      <i class="bi bi-trophy me-2" style="color:var(--raven-accent);"></i>Top Técnicos no Período
+      <i class="bi bi-trophy me-2" style="color:var(--itsm-accent);"></i>Top Técnicos no Período
     </span>
   </div>
   <div style="overflow-x:auto;">
-    <table class="table raven-table mb-0">
+    <table class="table itsm-table mb-0">
       <thead><tr><th>Técnico</th><th>Tickets</th><th>Participação</th></tr></thead>
       <tbody>
       {% for tech in by_tech %}
@@ -118,10 +118,10 @@
         <td style="min-width:160px;">
           {% if total > 0 %}
           <div style="display:flex;align-items:center;gap:.5rem;">
-            <div style="flex:1;background:var(--raven-border);border-radius:3px;height:6px;">
-              <div style="width:{% widthratio tech.count total 100 %}%;background:var(--raven-accent);height:6px;border-radius:3px;"></div>
+            <div style="flex:1;background:var(--itsm-border);border-radius:3px;height:6px;">
+              <div style="width:{% widthratio tech.count total 100 %}%;background:var(--itsm-accent);height:6px;border-radius:3px;"></div>
             </div>
-            <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--raven-muted);">
+            <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--itsm-muted);">
               {% widthratio tech.count total 100 %}%
             </span>
           </div>
@@ -137,14 +137,14 @@
 
 <!-- Top categorias -->
 {% if by_category %}
-<div class="raven-card">
-  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);">
+<div class="itsm-card">
+  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);">
     <span style="font-weight:600;font-size:.9rem;">
-      <i class="bi bi-tags me-2" style="color:var(--raven-accent);"></i>Tickets por Categoria
+      <i class="bi bi-tags me-2" style="color:var(--itsm-accent);"></i>Tickets por Categoria
     </span>
   </div>
   <div style="overflow-x:auto;">
-    <table class="table raven-table mb-0">
+    <table class="table itsm-table mb-0">
       <thead><tr><th>Categoria</th><th>Tickets</th><th>Distribuição</th></tr></thead>
       <tbody>
       {% for cat in by_category %}
@@ -154,10 +154,10 @@
         <td style="min-width:160px;">
           {% if total > 0 %}
           <div style="display:flex;align-items:center;gap:.5rem;">
-            <div style="flex:1;background:var(--raven-border);border-radius:3px;height:6px;">
-              <div style="width:{% widthratio cat.count total 100 %}%;background:var(--raven-success);height:6px;border-radius:3px;"></div>
+            <div style="flex:1;background:var(--itsm-border);border-radius:3px;height:6px;">
+              <div style="width:{% widthratio cat.count total 100 %}%;background:var(--itsm-success);height:6px;border-radius:3px;"></div>
             </div>
-            <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--raven-muted);">
+            <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--itsm-muted);">
               {% widthratio cat.count total 100 %}%
             </span>
           </div>

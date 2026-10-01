@@ -1,15 +1,15 @@
-<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;border:1px solid var(--raven-border);margin-bottom:.4rem;background:rgba(0,0,0,.1);">
+<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:6px;border:1px solid var(--itsm-border);margin-bottom:.4rem;background:rgba(0,0,0,.1);">
   <i class="{{ att.icon }}" style="font-size:1.25rem;flex-shrink:0;"></i>
   <div style="flex:1;min-width:0;">
     <div style="font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
       {{ att.filename }}
     </div>
-    <div style="font-size:.72rem;color:var(--raven-muted);">
+    <div style="font-size:.72rem;color:var(--itsm-muted);">
       {{ att.file_size_display }} &bull; {{ att.uploaded_by.username }} &bull; {{ att.created_at|date:"d/m H:i" }}
     </div>
   </div>
   <a href="{% url 'tickets:download_attachment' att.ticket.pk att.pk %}"
-     style="color:var(--raven-accent);flex-shrink:0;" title="Baixar">
+     style="color:var(--itsm-accent);flex-shrink:0;" title="Baixar">
     <i class="bi bi-download"></i>
   </a>
 </div>

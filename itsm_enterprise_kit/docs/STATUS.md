@@ -21,7 +21,9 @@
 
 ## 🔄 Fase 3 — Em andamento
 ### 3.0 — Refatoração (fazer primeiro)
-- [ ] Remover "RAVEN" de todo o projeto → "ITSM Enterprise"
+- [x] Recriar `itsm_project/` (settings.py, urls.py, wsgi.py) — pasta estava ausente do projeto e do git
+- [x] Criar comando de management `check_sla` (faltava, embora já citado aqui como concluído)
+- [x] Remover "RAVEN" de todo o projeto → "ITSM Enterprise"
 - [ ] Mover apps para `apps/` mantendo labels
 - [ ] Badges da sidebar (notificações não lidas, tickets sem técnico)
 

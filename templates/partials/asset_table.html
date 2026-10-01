@@ -1,6 +1,6 @@
-<div class="raven-card">
+<div class="itsm-card">
   <div style="overflow-x:auto;">
-    <table class="table raven-table mb-0">
+    <table class="table itsm-table mb-0">
       <thead><tr>
         <th>Tag</th>
         <th>Nome / Hostname</th>
@@ -20,14 +20,14 @@
           </a>
         </td>
         <td>
-          <a href="{% url 'cmdb:detail' asset.pk %}" style="color:var(--raven-text);text-decoration:none;font-weight:500;">
+          <a href="{% url 'cmdb:detail' asset.pk %}" style="color:var(--itsm-text);text-decoration:none;font-weight:500;">
             {{ asset.name }}
           </a>
           {% if asset.brand %}
-          <div style="font-size:.75rem;color:var(--raven-muted);">{{ asset.brand }} {{ asset.model }}</div>
+          <div style="font-size:.75rem;color:var(--itsm-muted);">{{ asset.brand }} {{ asset.model }}</div>
           {% endif %}
         </td>
-        <td style="font-size:.82rem;color:var(--raven-muted);">
+        <td style="font-size:.82rem;color:var(--itsm-muted);">
           {% if asset.asset_type %}
           <i class="{{ asset.asset_type.icon }} me-1"></i>{{ asset.asset_type.name }}
           {% else %}—{% endif %}
@@ -45,8 +45,8 @@
         <td style="font-family:'JetBrains Mono',monospace;font-size:.8rem;">
           {{ asset.ip_address|default:"—" }}
         </td>
-        <td style="font-size:.82rem;color:var(--raven-muted);">{{ asset.department|default:"—" }}</td>
-        <td style="font-size:.82rem;color:var(--raven-muted);">
+        <td style="font-size:.82rem;color:var(--itsm-muted);">{{ asset.department|default:"—" }}</td>
+        <td style="font-size:.82rem;color:var(--itsm-muted);">
           {% if asset.owner %}{{ asset.owner.username }}{% else %}—{% endif %}
         </td>
         <td>
@@ -59,10 +59,10 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" style="text-align:center;color:var(--raven-muted);padding:3rem;">
+        <td colspan="8" style="text-align:center;color:var(--itsm-muted);padding:3rem;">
           <i class="bi bi-hdd" style="font-size:2.5rem;display:block;margin-bottom:.75rem;"></i>
           Nenhum ativo cadastrado.
-          <a href="{% url 'cmdb:create' %}" style="color:var(--raven-accent);">Adicionar o primeiro?</a>
+          <a href="{% url 'cmdb:create' %}" style="color:var(--itsm-accent);">Adicionar o primeiro?</a>
         </td>
       </tr>
       {% endfor %}

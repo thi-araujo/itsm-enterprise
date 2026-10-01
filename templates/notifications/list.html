@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 style="font-weight:700;margin-bottom:.25rem;">Notificações</h4>
-    <p style="color:var(--raven-muted);font-size:.85rem;margin:0;">{{ notifications|length }} notificação{{ notifications|length|pluralize:",ões" }}</p>
+    <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">{{ notifications|length }} notificação{{ notifications|length|pluralize:",ões" }}</p>
   </div>
   {% if notifications %}
   <form method="POST" action="{% url 'notifications:mark_all_read' %}">
@@ -18,9 +18,9 @@
   {% endif %}
 </div>
 
-<div class="raven-card">
+<div class="itsm-card">
   {% for notif in notifications %}
-  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;align-items:start;gap:1rem;
+  <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);display:flex;align-items:start;gap:1rem;
     {% if not notif.is_read %}background:rgba(79,142,247,.04);{% endif %}">
     <div style="font-size:1.25rem;flex-shrink:0;margin-top:.1rem;">
       <i class="{{ notif.type_icon }}"></i>
@@ -30,28 +30,28 @@
         <span style="font-weight:{% if not notif.is_read %}600{% else %}400{% endif %};font-size:.9rem;">
           {{ notif.title }}
         </span>
-        <span style="font-size:.72rem;color:var(--raven-muted);flex-shrink:0;margin-left:1rem;">
+        <span style="font-size:.72rem;color:var(--itsm-muted);flex-shrink:0;margin-left:1rem;">
           {{ notif.created_at|timesince }} atrás
         </span>
       </div>
-      <div style="font-size:.82rem;color:var(--raven-muted);line-height:1.5;">
+      <div style="font-size:.82rem;color:var(--itsm-muted);line-height:1.5;">
         {{ notif.message|truncatechars:120 }}
       </div>
       {% if notif.ticket_id %}
       <div style="margin-top:.5rem;">
         <a href="{% url 'tickets:detail' notif.ticket_id %}"
-           style="font-size:.8rem;color:var(--raven-accent);text-decoration:none;">
+           style="font-size:.8rem;color:var(--itsm-accent);text-decoration:none;">
           <i class="bi bi-arrow-right me-1"></i>Ver ticket INC-2026-{{ notif.ticket_id|stringformat:"04d" }}
         </a>
       </div>
       {% endif %}
     </div>
     {% if not notif.is_read %}
-    <div style="width:8px;height:8px;background:var(--raven-accent);border-radius:50%;flex-shrink:0;margin-top:.4rem;"></div>
+    <div style="width:8px;height:8px;background:var(--itsm-accent);border-radius:50%;flex-shrink:0;margin-top:.4rem;"></div>
     {% endif %}
   </div>
   {% empty %}
-  <div style="text-align:center;color:var(--raven-muted);padding:4rem 2rem;">
+  <div style="text-align:center;color:var(--itsm-muted);padding:4rem 2rem;">
     <i class="bi bi-bell-slash" style="font-size:3rem;display:block;margin-bottom:1rem;"></i>
     <div style="font-size:.9rem;">Nenhuma notificação ainda.</div>
     <div style="font-size:.8rem;margin-top:.25rem;">

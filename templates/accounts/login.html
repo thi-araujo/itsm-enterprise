@@ -1,21 +1,21 @@
 {% extends 'base.html' %}
 {% block auth_content %}
-<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 20% 50%,rgba(79,142,247,.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(124,58,237,.08) 0%,transparent 50%),var(--raven-bg);">
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 20% 50%,rgba(79,142,247,.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(124,58,237,.08) 0%,transparent 50%),var(--itsm-bg);">
 <div style="width:100%;max-width:400px;padding:1rem;">
 <div style="text-align:center;margin-bottom:2.5rem;">
-<div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;color:var(--raven-accent);letter-spacing:4px;">ITSM PRO</div>
-<div style="font-size:.7rem;color:var(--raven-muted);letter-spacing:4px;text-transform:uppercase;">ITSM Enterprise</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;color:var(--itsm-accent);letter-spacing:4px;">ITSM PRO</div>
+<div style="font-size:.7rem;color:var(--itsm-muted);letter-spacing:4px;text-transform:uppercase;">ITSM Enterprise</div>
 </div>
-<div class="raven-card" style="padding:2rem;">
-<h5 style="margin-bottom:1.5rem;font-weight:600;"><i class="bi bi-shield-lock me-2" style="color:var(--raven-accent);"></i>Acesso ao Sistema</h5>
+<div class="itsm-card" style="padding:2rem;">
+<h5 style="margin-bottom:1.5rem;font-weight:600;"><i class="bi bi-shield-lock me-2" style="color:var(--itsm-accent);"></i>Acesso ao Sistema</h5>
 {% if messages %}{% for message in messages %}<div class="alert alert-danger py-2 mb-3" style="font-size:.85rem;"><i class="bi bi-exclamation-circle me-1"></i>{{ message }}</div>{% endfor %}{% endif %}
 <form method="POST">{% csrf_token %}
-<div class="mb-3"><label class="form-label" style="font-size:.8rem;color:var(--raven-muted);text-transform:uppercase;letter-spacing:1px;">Usuário</label>
+<div class="mb-3"><label class="form-label" style="font-size:.8rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">Usuário</label>
 <input type="text" name="username" class="form-control" placeholder="seu.usuario" required autofocus></div>
-<div class="mb-4"><label class="form-label" style="font-size:.8rem;color:var(--raven-muted);text-transform:uppercase;letter-spacing:1px;">Senha</label>
+<div class="mb-4"><label class="form-label" style="font-size:.8rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">Senha</label>
 <input type="password" name="password" class="form-control" placeholder="••••••••" required></div>
-<button type="submit" class="btn btn-raven w-100"><i class="bi bi-box-arrow-in-right me-2"></i>Entrar</button>
+<button type="submit" class="btn btn-itsm w-100"><i class="bi bi-box-arrow-in-right me-2"></i>Entrar</button>
 </form></div>
-<div style="text-align:center;margin-top:1.5rem;font-size:.7rem;color:var(--raven-muted);">ITSM PRO © 2026 v1.0 &bull; Powered by Django</div>
+<div style="text-align:center;margin-top:1.5rem;font-size:.7rem;color:var(--itsm-muted);">ITSM PRO © 2026 v1.0 &bull; Powered by Django</div>
 </div></div>
 {% endblock %}

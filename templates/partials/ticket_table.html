@@ -1,6 +1,6 @@
-<div class="raven-card">
+<div class="itsm-card">
   <div style="overflow-x:auto;">
-    <table class="table raven-table mb-0">
+    <table class="table itsm-table mb-0">
       <thead><tr>
         <th>ID</th><th>Título</th><th>Tipo</th><th>Prioridade</th><th>Status</th>
         <th>Responsável</th><th>SLA</th><th>Criado</th>
@@ -10,27 +10,27 @@
       <tr>
         <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">INC-2026-{{ t.pk|stringformat:"04d" }}</a></td>
         <td style="max-width:280px;">
-          <a href="{% url 'tickets:detail' t.pk %}" style="color:var(--raven-text);text-decoration:none;">{{ t.title|truncatechars:55 }}</a>
+          <a href="{% url 'tickets:detail' t.pk %}" style="color:var(--itsm-text);text-decoration:none;">{{ t.title|truncatechars:55 }}</a>
         </td>
-        <td style="font-size:.8rem;color:var(--raven-muted);">{{ t.get_ticket_type_display }}</td>
+        <td style="font-size:.8rem;color:var(--itsm-muted);">{{ t.get_ticket_type_display }}</td>
         <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
-        <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
-        <td style="font-size:.8rem;color:var(--raven-muted);">{% if t.assignee %}{{ t.assignee.username }}{% else %}—{% endif %}</td>
+        <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--itsm-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+        <td style="font-size:.8rem;color:var(--itsm-muted);">{% if t.assignee %}{{ t.assignee.username }}{% else %}—{% endif %}</td>
         <td>
           {% if t.sla_deadline %}
             {% if t.is_sla_breached %}
               <span class="sla-breached" style="font-size:.8rem;"><i class="bi bi-alarm-fill"></i> Vencido</span>
             {% else %}
-              <span style="font-size:.8rem;color:var(--raven-success);"><i class="bi bi-check-circle"></i> OK</span>
+              <span style="font-size:.8rem;color:var(--itsm-success);"><i class="bi bi-check-circle"></i> OK</span>
             {% endif %}
           {% else %}—{% endif %}
         </td>
-        <td style="font-size:.8rem;color:var(--raven-muted);">{{ t.created_at|date:"d/m H:i" }}</td>
+        <td style="font-size:.8rem;color:var(--itsm-muted);">{{ t.created_at|date:"d/m H:i" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="8" style="text-align:center;color:var(--raven-muted);padding:3rem;">
+      <tr><td colspan="8" style="text-align:center;color:var(--itsm-muted);padding:3rem;">
         <i class="bi bi-inbox" style="font-size:2.5rem;display:block;margin-bottom:.75rem;"></i>
-        Nenhum ticket encontrado. <a href="{% url 'tickets:create' %}" style="color:var(--raven-accent);">Abrir o primeiro?</a>
+        Nenhum ticket encontrado. <a href="{% url 'tickets:create' %}" style="color:var(--itsm-accent);">Abrir o primeiro?</a>
       </td></tr>
       {% endfor %}
       </tbody>

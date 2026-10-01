@@ -2,19 +2,19 @@
   {% if comment.is_internal %}
   background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.25);
   {% else %}
-  background:rgba(79,142,247,.03);border:1px solid var(--raven-border);
+  background:rgba(79,142,247,.03);border:1px solid var(--itsm-border);
   {% endif %}">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
     <div style="font-size:.8rem;font-weight:600;">
       <i class="bi bi-person-circle me-1"></i>
       {{ comment.author.get_full_name|default:comment.author.username }}
       {% if comment.is_internal %}
-      <span style="font-size:.7rem;color:var(--raven-warning);margin-left:.4rem;">
+      <span style="font-size:.7rem;color:var(--itsm-warning);margin-left:.4rem;">
         <i class="bi bi-lock-fill"></i> Nota interna
       </span>
       {% endif %}
     </div>
-    <span style="font-size:.72rem;color:var(--raven-muted);">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+    <span style="font-size:.72rem;color:var(--itsm-muted);">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
   </div>
   <p style="margin:0;font-size:.875rem;line-height:1.65;white-space:pre-wrap;">{{ comment.content }}</p>
 </div>

@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 style="font-weight:700;margin-bottom:.25rem;">Fila de Atendimento</h4>
-    <p style="color:var(--raven-muted);font-size:.85rem;margin:0;">
+    <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">
       {{ unassigned.count }} sem técnico &bull; {{ my_queue.count }} atribuídos a mim
     </p>
   </div>
@@ -15,21 +15,21 @@
 <div class="row g-3">
   <!-- SEM TÉCNICO -->
   <div class="col-lg-6">
-    <div class="raven-card">
-      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;align-items:center;gap:.75rem;">
-        <span style="width:10px;height:10px;background:var(--raven-warning);border-radius:50%;display:inline-block;"></span>
+    <div class="itsm-card">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);display:flex;align-items:center;gap:.75rem;">
+        <span style="width:10px;height:10px;background:var(--itsm-warning);border-radius:50%;display:inline-block;"></span>
         <span style="font-weight:600;font-size:.9rem;">Sem Técnico Atribuído</span>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--raven-warning);">{{ unassigned.count }}</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--itsm-warning);">{{ unassigned.count }}</span>
       </div>
       <div style="padding:.75rem;max-height:600px;overflow-y:auto;">
         {% for t in unassigned %}
-        <div style="padding:.85rem;border-radius:6px;border:1px solid var(--raven-border);margin-bottom:.5rem;background:rgba(0,0,0,.1);">
+        <div style="padding:.85rem;border-radius:6px;border:1px solid var(--itsm-border);margin-bottom:.5rem;background:rgba(0,0,0,.1);">
           <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.5rem;">
             <a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">#{{ t.pk|stringformat:"04d" }}</a>
             <span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span>
           </div>
           <div style="font-size:.85rem;margin-bottom:.75rem;font-weight:500;">{{ t.title|truncatechars:60 }}</div>
-          <div style="font-size:.75rem;color:var(--raven-muted);margin-bottom:.75rem;">
+          <div style="font-size:.75rem;color:var(--itsm-muted);margin-bottom:.75rem;">
             <i class="bi bi-person me-1"></i>{{ t.requester.username }}
             &bull; <i class="bi bi-clock me-1 ms-1"></i>{{ t.created_at|timesince }} atrás
             {% if t.is_sla_breached %}&bull; <span class="sla-breached"><i class="bi bi-alarm-fill"></i> SLA vencido</span>{% endif %}
@@ -42,14 +42,14 @@
               <option value="{{ tech.pk }}">{{ tech.get_full_name|default:tech.username }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="btn btn-raven btn-sm" style="white-space:nowrap;">
+            <button type="submit" class="btn btn-itsm btn-sm" style="white-space:nowrap;">
               <i class="bi bi-person-check"></i>
             </button>
           </form>
         </div>
         {% empty %}
-        <div style="text-align:center;color:var(--raven-muted);padding:2.5rem;font-size:.85rem;">
-          <i class="bi bi-check-circle" style="font-size:2rem;display:block;margin-bottom:.5rem;color:var(--raven-success);"></i>
+        <div style="text-align:center;color:var(--itsm-muted);padding:2.5rem;font-size:.85rem;">
+          <i class="bi bi-check-circle" style="font-size:2rem;display:block;margin-bottom:.5rem;color:var(--itsm-success);"></i>
           Nenhum ticket sem atribuição!
         </div>
         {% endfor %}
@@ -59,27 +59,27 @@
 
   <!-- MEUS TICKETS -->
   <div class="col-lg-6">
-    <div class="raven-card">
-      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;align-items:center;gap:.75rem;">
-        <span style="width:10px;height:10px;background:var(--raven-accent);border-radius:50%;display:inline-block;"></span>
+    <div class="itsm-card">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);display:flex;align-items:center;gap:.75rem;">
+        <span style="width:10px;height:10px;background:var(--itsm-accent);border-radius:50%;display:inline-block;"></span>
         <span style="font-weight:600;font-size:.9rem;">Meus Tickets em Aberto</span>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--raven-accent);">{{ my_queue.count }}</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--itsm-accent);">{{ my_queue.count }}</span>
       </div>
       <div style="padding:.75rem;max-height:600px;overflow-y:auto;">
         {% for t in my_queue %}
         <a href="{% url 'tickets:detail' t.pk %}" style="text-decoration:none;display:block;">
-          <div style="padding:.85rem;border-radius:6px;border:1px solid var(--raven-border);margin-bottom:.5rem;background:rgba(0,0,0,.1);transition:border-color .15s;"
-               onmouseover="this.style.borderColor='var(--raven-accent)'"
-               onmouseout="this.style.borderColor='var(--raven-border)'">
+          <div style="padding:.85rem;border-radius:6px;border:1px solid var(--itsm-border);margin-bottom:.5rem;background:rgba(0,0,0,.1);transition:border-color .15s;"
+               onmouseover="this.style.borderColor='var(--itsm-accent)'"
+               onmouseout="this.style.borderColor='var(--itsm-border)'">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.4rem;">
               <span class="ticket-id">#{{ t.pk|stringformat:"04d" }}</span>
               <div class="d-flex gap-1">
                 <span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span>
-                <span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span>
+                <span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--itsm-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span>
               </div>
             </div>
             <div style="font-size:.85rem;font-weight:500;margin-bottom:.35rem;">{{ t.title|truncatechars:60 }}</div>
-            <div style="font-size:.75rem;color:var(--raven-muted);">
+            <div style="font-size:.75rem;color:var(--itsm-muted);">
               <i class="bi bi-person me-1"></i>{{ t.requester.username }}
               {% if t.is_sla_breached %}
               &bull; <span class="sla-breached"><i class="bi bi-alarm-fill"></i> SLA vencido</span>
@@ -88,7 +88,7 @@
           </div>
         </a>
         {% empty %}
-        <div style="text-align:center;color:var(--raven-muted);padding:2.5rem;font-size:.85rem;">
+        <div style="text-align:center;color:var(--itsm-muted);padding:2.5rem;font-size:.85rem;">
           <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
           Nenhum ticket atribuído a você
         </div>
