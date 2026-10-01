@@ -107,7 +107,7 @@ def ticket_update_status(request, pk):
     if request.method == 'POST':
         form = TicketUpdateForm(request.POST, instance=ticket)
         if form.is_valid():
-            form.save()
+            updated = form.save()
             try:
                 from apps.notifications.email import notify_ticket_assigned, notify_ticket_resolved
                 if updated.assignee:
