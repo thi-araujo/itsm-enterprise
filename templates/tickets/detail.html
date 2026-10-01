@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block title %}INC-2026-{{ ticket.pk|stringformat:"04d" }} — RAVEN ITSM{% endblock %}
+{% block breadcrumb %}
+<a href="{% url 'tickets:list' %}" style="color:var(--raven-muted);text-decoration:none;">Tickets</a>
+<i class="bi bi-chevron-right mx-1" style="font-size:.7rem;"></i>
+<span class="ticket-id">INC-2026-{{ ticket.pk|stringformat:"04d" }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  <!-- COLUNA PRINCIPAL -->
+  <div class="col-lg-8">
+
+    <!-- Header do ticket -->
+    <div class="raven-card mb-3" style="padding:1.5rem;">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="ticket-id">INC-2026-{{ ticket.pk|stringformat:"04d" }}</span>
+          <span class="priority-badge badge-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
+          <span style="font-size:.78rem;color:var(--raven-muted);padding:.25rem .6rem;border:1px solid var(--raven-border);border-radius:4px;">
+            {{ ticket.get_ticket_type_display }}
+          </span>
+          {% if ticket.category %}
+          <span style="font-size:.78rem;color:var(--raven-muted);padding:.25rem .6rem;border:1px solid var(--raven-border);border-radius:4px;">
+            <i class="bi bi-tag me-1"></i>{{ ticket.category }}
+          </span>
+          {% endif %}
+        </div>
+        <span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">
+          {{ ticket.get_status_display }}
+        </span>
+      </div>
+      <h4 style="font-weight:700;margin-bottom:1rem;line-height:1.3;">{{ ticket.title }}</h4>
+      <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:1rem;margin-bottom:1rem;">
+        <p style="margin:0;font-size:.9rem;line-height:1.75;white-space:pre-wrap;">{{ ticket.description }}</p>
+      </div>
+      <div style="font-size:.8rem;color:var(--raven-muted);">
+        <i class="bi bi-person me-1"></i>{{ ticket.requester.get_full_name|default:ticket.requester.username }}
+        &nbsp;&bull;&nbsp;
+        <i class="bi bi-calendar3 me-1"></i>{{ ticket.created_at|date:"d/m/Y H:i" }}
+      </div>
+    </div>
+
+    <!-- Anexos -->
+    <div class="raven-card mb-3">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;font-size:.9rem;">
+          <i class="bi bi-paperclip me-2" style="color:var(--raven-accent);"></i>
+          Anexos <span style="color:var(--raven-muted);font-weight:400;">({{ attachments.count }})</span>
+        </span>
+        <button class="btn btn-sm"
+                style="border:1px solid var(--raven-border);color:var(--raven-muted);font-size:.8rem;"
+                onclick="document.getElementById('attach-zone').classList.toggle('d-none')">
+          <i class="bi bi-upload me-1"></i>Enviar
+        </button>
+      </div>
+
+      <div id="attach-zone" class="d-none" style="padding:1rem;border-bottom:1px solid var(--raven-border);">
+        <form hx-post="{% url 'tickets:upload_attachment' ticket.pk %}"
+              hx-target="#attachments-list"
+              hx-swap="beforeend"
+              hx-encoding="multipart/form-data"
+              hx-on::after-request="this.reset(); document.getElementById('attach-zone').classList.add('d-none')">
+          {% csrf_token %}
+          <div class="d-flex gap-2">
+            <input type="file" name="file" class="form-control form-control-sm"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.log,.zip" required>
+            <button type="submit" class="btn btn-raven btn-sm" style="white-space:nowrap;">
+              <i class="bi bi-upload me-1"></i>Enviar
+            </button>
+          </div>
+          <div style="font-size:.72rem;color:var(--raven-muted);margin-top:.4rem;">
+            PDF, DOC, XLS, PNG, JPG, TXT, ZIP — máx. 10MB
+          </div>
+        </form>
+      </div>
+
+      <div id="attachments-list" style="padding:.75rem;">
+        {% for att in attachments %}
+          {% include 'partials/attachment_item.html' with att=att %}
+        {% empty %}
+          <div style="text-align:center;color:var(--raven-muted);padding:1.25rem;font-size:.85rem;">
+            <i class="bi bi-paperclip" style="font-size:1.5rem;display:block;margin-bottom:.4rem;"></i>
+            Nenhum anexo
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Comentários -->
+    <div class="raven-card">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);">
+        <span style="font-weight:600;font-size:.9rem;">
+          <i class="bi bi-chat-left-text me-2" style="color:var(--raven-accent);"></i>
+          Histórico <span style="color:var(--raven-muted);font-weight:400;">({{ comments.count }})</span>
+        </span>
+      </div>
+
+      <div style="padding:1rem;" id="comments-list">
+        {% for comment in comments %}
+          {% include 'partials/comment_item.html' with comment=comment %}
+        {% empty %}
+          <div style="text-align:center;color:var(--raven-muted);padding:2rem;font-size:.85rem;">
+            Nenhum comentário ainda.
+          </div>
+        {% endfor %}
+      </div>
+
+      <div style="padding:1rem;border-top:1px solid var(--raven-border);">
+        <form hx-post="{% url 'tickets:add_comment' ticket.pk %}"
+              hx-target="#comments-list"
+              hx-swap="beforeend"
+              hx-on::after-request="this.reset()">
+          {% csrf_token %}
+          {{ comment_form.content }}
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <div class="form-check">
+              {{ comment_form.is_internal }}
+              <label class="form-check-label" style="font-size:.8rem;color:var(--raven-muted);">
+                <i class="bi bi-lock me-1"></i>Nota interna (só técnicos)
+              </label>
+            </div>
+            <button type="submit" class="btn btn-raven btn-sm">
+              <i class="bi bi-send me-1"></i>Comentar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COLUNA LATERAL -->
+  <div class="col-lg-4">
+
+    <!-- Atualizar ticket -->
+    <div class="raven-card mb-3" style="padding:1.25rem;">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
+        <i class="bi bi-gear me-2" style="color:var(--raven-accent);"></i>Atualizar Ticket
+      </div>
+      <form method="POST" action="{% url 'tickets:update_status' ticket.pk %}">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label" style="font-size:.72rem;color:var(--raven-muted);text-transform:uppercase;letter-spacing:1px;">Status</label>
+          {{ update_form.status }}
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:.72rem;color:var(--raven-muted);text-transform:uppercase;letter-spacing:1px;">Técnico Responsável</label>
+          {{ update_form.assignee }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.72rem;color:var(--raven-muted);text-transform:uppercase;letter-spacing:1px;">Prioridade</label>
+          {{ update_form.priority }}
+        </div>
+        <button type="submit" class="btn btn-raven btn-sm w-100">
+          <i class="bi bi-floppy me-1"></i>Salvar Alterações
+        </button>
+      </form>
+    </div>
+
+    <!-- Informações -->
+    <div class="raven-card" style="padding:1.25rem;">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
+        <i class="bi bi-info-circle me-2" style="color:var(--raven-accent);"></i>Informações
+      </div>
+      <div style="font-size:.82rem;">
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--raven-border);">
+          <span style="color:var(--raven-muted);">Solicitante</span>
+          <span>{{ ticket.requester.get_full_name|default:ticket.requester.username }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--raven-border);">
+          <span style="color:var(--raven-muted);">Responsável</span>
+          <span>{% if ticket.assignee %}{{ ticket.assignee.get_full_name|default:ticket.assignee.username }}{% else %}Não atribuído{% endif %}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--raven-border);">
+          <span style="color:var(--raven-muted);">SLA Deadline</span>
+          <span class="{% if ticket.is_sla_breached %}sla-breached{% else %}text-success{% endif %}">
+            {% if ticket.sla_deadline %}{{ ticket.sla_deadline|date:"d/m H:i" }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--raven-border);">
+          <span style="color:var(--raven-muted);">Tempo restante</span>
+          <span class="{% if ticket.is_sla_breached %}sla-breached{% elif ticket.sla_remaining_hours is not None and ticket.sla_remaining_hours < 2 %}text-warning{% else %}text-success{% endif %}">
+            {% if ticket.is_sla_breached %}VENCIDO
+            {% elif ticket.sla_remaining_hours is not None %}{{ ticket.sla_remaining_hours }}h
+            {% else %}—{% endif %}
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--raven-border);">
+          <span style="color:var(--raven-muted);">Criado</span>
+          <span>{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;">
+          <span style="color:var(--raven-muted);">Atualizado</span>
+          <span>{{ ticket.updated_at|date:"d/m/Y H:i" }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

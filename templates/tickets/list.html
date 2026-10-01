@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Tickets — ITSM PRO{% endblock %}
+{% block breadcrumb %}<i class="bi bi-ticket-perforated me-2"></i> Tickets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 style="font-weight:700;margin-bottom:.25rem;">Tickets</h4>
+    <p style="color:var(--raven-muted);font-size:.85rem;margin:0;">{{ total }} chamado{{ total|pluralize:",s" }} encontrado{{ total|pluralize:",s" }}</p>
+  </div>
+  <a href="{% url 'tickets:create' %}" class="btn btn-raven"><i class="bi bi-plus-lg me-1"></i> Novo Ticket</a>
+</div>
+
+<!-- Filtros -->
+<div class="raven-card mb-4" style="padding:1rem 1.25rem;">
+  <form hx-get="{% url 'tickets:list' %}" hx-target="#ticket-table" hx-trigger="change, submit" hx-push-url="true">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" name="search" class="form-control form-control-sm" placeholder="Buscar por título ou descrição..." value="{{ search }}">
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Todos os status</option>
+          <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Aberto</option>
+          <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>Em Andamento</option>
+          <option value="waiting" {% if status_filter == 'waiting' %}selected{% endif %}>Aguardando</option>
+          <option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Resolvido</option>
+          <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Fechado</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="priority" class="form-select form-select-sm">
+          <option value="">Todas as prioridades</option>
+          <option value="critical" {% if priority_filter == 'critical' %}selected{% endif %}>Crítica</option>
+          <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>Alta</option>
+          <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Média</option>
+          <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Baixa</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <a href="{% url 'tickets:list' %}" class="btn btn-outline-secondary btn-sm w-100">Limpar</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="ticket-table">
+  {% include 'partials/ticket_table.html' %}
+</div>
+{% endblock %}

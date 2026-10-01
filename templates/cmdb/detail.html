@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}{{ asset.name }} — CMDB — ITSM PRO{% endblock %}
+{% block breadcrumb %}
+<a href="{% url 'cmdb:list' %}" style="color:var(--raven-muted);text-decoration:none;">CMDB</a>
+<i class="bi bi-chevron-right mx-1" style="font-size:.7rem;"></i>
+{{ asset.asset_tag }}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+
+    <!-- Info principal -->
+    <div class="raven-card mb-3" style="padding:1.5rem;">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <span class="ticket-id me-2">{{ asset.asset_tag }}</span>
+          <span class="status-badge" style="
+            {% if asset.status == 'active' %}background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);
+            {% elif asset.status == 'maintenance' %}background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);
+            {% elif asset.status == 'disposed' %}background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);
+            {% else %}background:rgba(90,106,138,.15);color:#5a6a8a;border:1px solid rgba(90,106,138,.3);
+            {% endif %}">
+            {{ asset.get_status_display }}
+          </span>
+        </div>
+        <a href="{% url 'cmdb:edit' asset.pk %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Editar
+        </a>
+      </div>
+
+      <h4 style="font-weight:700;margin-bottom:.5rem;">{{ asset.name }}</h4>
+      {% if asset.asset_type %}
+      <p style="color:var(--raven-muted);font-size:.85rem;margin-bottom:1.25rem;">
+        <i class="{{ asset.asset_type.icon }} me-1"></i>{{ asset.asset_type.name }}
+      </p>
+      {% endif %}
+
+      <div class="row g-3" style="font-size:.85rem;">
+        {% if asset.brand %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Fabricante</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.brand }}</div>
+        </div>
+        {% endif %}
+        {% if asset.model %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Modelo</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.model }}</div>
+        </div>
+        {% endif %}
+        {% if asset.serial %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Nº de Série</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.serial }}</div>
+        </div>
+        {% endif %}
+        {% if asset.ip_address %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Endereço IP</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.ip_address }}</div>
+        </div>
+        {% endif %}
+        {% if asset.mac_address %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">MAC Address</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.82rem;margin-top:.2rem;">{{ asset.mac_address }}</div>
+        </div>
+        {% endif %}
+        {% if asset.location %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Localização</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.location }}</div>
+        </div>
+        {% endif %}
+        {% if asset.department %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Departamento</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.department }}</div>
+        </div>
+        {% endif %}
+        {% if asset.owner %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Responsável</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.owner.get_full_name|default:asset.owner.username }}</div>
+        </div>
+        {% endif %}
+        {% if asset.purchase_date %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Data de Compra</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.purchase_date|date:"d/m/Y" }}</div>
+        </div>
+        {% endif %}
+        {% if asset.warranty_expiry %}
+        <div class="col-6">
+          <div style="color:var(--raven-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;">Garantia até</div>
+          <div style="font-weight:500;margin-top:.2rem;">{{ asset.warranty_expiry|date:"d/m/Y" }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if asset.notes %}
+      <div style="margin-top:1.25rem;padding:1rem;background:rgba(0,0,0,.2);border-radius:6px;font-size:.875rem;line-height:1.65;">
+        {{ asset.notes }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tickets vinculados -->
+    <div class="raven-card">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--raven-border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;font-size:.9rem;">
+          <i class="bi bi-ticket-perforated me-2" style="color:var(--raven-accent);"></i>
+          Chamados Vinculados
+        </span>
+        <a href="{% url 'tickets:create' %}" style="font-size:.8rem;color:var(--raven-accent);text-decoration:none;">
+          <i class="bi bi-plus me-1"></i>Abrir chamado
+        </a>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table raven-table mb-0">
+          <thead><tr><th>ID</th><th>Título</th><th>Prioridade</th><th>Status</th><th>Data</th></tr></thead>
+          <tbody>
+          {% for t in tickets %}
+          <tr>
+            <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">#{{ t.pk|stringformat:"04d" }}</a></td>
+            <td style="font-size:.85rem;">{{ t.title|truncatechars:45 }}</td>
+            <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+            <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+            <td style="font-size:.78rem;color:var(--raven-muted);">{{ t.created_at|date:"d/m/Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" style="text-align:center;color:var(--raven-muted);padding:1.5rem;font-size:.85rem;">
+              Nenhum chamado vinculado a este ativo.
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

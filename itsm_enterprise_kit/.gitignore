@@ -1,0 +1,21 @@
+# Ambiente
+venv/
+.venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code (configuração pessoal)
+.claude/settings.local.json
+CLAUDE.local.md

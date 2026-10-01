@@ -1,0 +1,39 @@
+<div class="raven-card">
+  <div style="overflow-x:auto;">
+    <table class="table raven-table mb-0">
+      <thead><tr>
+        <th>ID</th><th>Título</th><th>Tipo</th><th>Prioridade</th><th>Status</th>
+        <th>Responsável</th><th>SLA</th><th>Criado</th>
+      </tr></thead>
+      <tbody>
+      {% for t in tickets %}
+      <tr>
+        <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">INC-2026-{{ t.pk|stringformat:"04d" }}</a></td>
+        <td style="max-width:280px;">
+          <a href="{% url 'tickets:detail' t.pk %}" style="color:var(--raven-text);text-decoration:none;">{{ t.title|truncatechars:55 }}</a>
+        </td>
+        <td style="font-size:.8rem;color:var(--raven-muted);">{{ t.get_ticket_type_display }}</td>
+        <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+        <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--raven-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+        <td style="font-size:.8rem;color:var(--raven-muted);">{% if t.assignee %}{{ t.assignee.username }}{% else %}—{% endif %}</td>
+        <td>
+          {% if t.sla_deadline %}
+            {% if t.is_sla_breached %}
+              <span class="sla-breached" style="font-size:.8rem;"><i class="bi bi-alarm-fill"></i> Vencido</span>
+            {% else %}
+              <span style="font-size:.8rem;color:var(--raven-success);"><i class="bi bi-check-circle"></i> OK</span>
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:.8rem;color:var(--raven-muted);">{{ t.created_at|date:"d/m H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;color:var(--raven-muted);padding:3rem;">
+        <i class="bi bi-inbox" style="font-size:2.5rem;display:block;margin-bottom:.75rem;"></i>
+        Nenhum ticket encontrado. <a href="{% url 'tickets:create' %}" style="color:var(--raven-accent);">Abrir o primeiro?</a>
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

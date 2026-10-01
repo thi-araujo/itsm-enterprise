@@ -1,0 +1,72 @@
+<div class="raven-card">
+  <div style="overflow-x:auto;">
+    <table class="table raven-table mb-0">
+      <thead><tr>
+        <th>Tag</th>
+        <th>Nome / Hostname</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>IP</th>
+        <th>Departamento</th>
+        <th>Responsável</th>
+        <th>Chamados</th>
+      </tr></thead>
+      <tbody>
+      {% for asset in assets %}
+      <tr>
+        <td>
+          <a href="{% url 'cmdb:detail' asset.pk %}" class="ticket-id text-decoration-none">
+            {{ asset.asset_tag }}
+          </a>
+        </td>
+        <td>
+          <a href="{% url 'cmdb:detail' asset.pk %}" style="color:var(--raven-text);text-decoration:none;font-weight:500;">
+            {{ asset.name }}
+          </a>
+          {% if asset.brand %}
+          <div style="font-size:.75rem;color:var(--raven-muted);">{{ asset.brand }} {{ asset.model }}</div>
+          {% endif %}
+        </td>
+        <td style="font-size:.82rem;color:var(--raven-muted);">
+          {% if asset.asset_type %}
+          <i class="{{ asset.asset_type.icon }} me-1"></i>{{ asset.asset_type.name }}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="status-badge" style="
+            {% if asset.status == 'active' %}background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);
+            {% elif asset.status == 'maintenance' %}background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);
+            {% elif asset.status == 'disposed' %}background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);
+            {% else %}background:rgba(90,106,138,.15);color:#5a6a8a;border:1px solid rgba(90,106,138,.3);
+            {% endif %}">
+            {{ asset.get_status_display }}
+          </span>
+        </td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:.8rem;">
+          {{ asset.ip_address|default:"—" }}
+        </td>
+        <td style="font-size:.82rem;color:var(--raven-muted);">{{ asset.department|default:"—" }}</td>
+        <td style="font-size:.82rem;color:var(--raven-muted);">
+          {% if asset.owner %}{{ asset.owner.username }}{% else %}—{% endif %}
+        </td>
+        <td>
+          {% with count=asset.tickets.count %}
+          {% if count %}
+          <span class="ticket-id">{{ count }}</span>
+          {% else %}—{% endif %}
+          {% endwith %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" style="text-align:center;color:var(--raven-muted);padding:3rem;">
+          <i class="bi bi-hdd" style="font-size:2.5rem;display:block;margin-bottom:.75rem;"></i>
+          Nenhum ativo cadastrado.
+          <a href="{% url 'cmdb:create' %}" style="color:var(--raven-accent);">Adicionar o primeiro?</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

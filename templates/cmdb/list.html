@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}CMDB — Ativos — ITSM PRO{% endblock %}
+{% block breadcrumb %}<i class="bi bi-hdd-stack me-2"></i> CMDB — Ativos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 style="font-weight:700;margin-bottom:.25rem;">Catálogo de Ativos (CMDB)</h4>
+    <p style="color:var(--raven-muted);font-size:.85rem;margin:0;">{{ total }} ativo{{ total|pluralize:",s" }} encontrado{{ total|pluralize:",s" }}</p>
+  </div>
+  <a href="{% url 'cmdb:create' %}" class="btn btn-raven">
+    <i class="bi bi-plus-lg me-1"></i> Novo Ativo
+  </a>
+</div>
+
+<!-- Filtros -->
+<div class="raven-card mb-4" style="padding:1rem 1.25rem;">
+  <form hx-get="{% url 'cmdb:list' %}" hx-target="#asset-table" hx-trigger="change, submit" hx-push-url="true">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" name="search" class="form-control form-control-sm"
+               placeholder="Buscar por nome, tag, IP, série..." value="{{ search }}">
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Todos os status</option>
+          <option value="active"      {% if status_filter == 'active' %}selected{% endif %}>Ativo</option>
+          <option value="inactive"    {% if status_filter == 'inactive' %}selected{% endif %}>Inativo</option>
+          <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Em Manutenção</option>
+          <option value="disposed"    {% if status_filter == 'disposed' %}selected{% endif %}>Descartado</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="type" class="form-select form-select-sm">
+          <option value="">Todos os tipos</option>
+          {% for t in types %}
+          <option value="{{ t.pk }}" {% if type_filter == t.pk|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <a href="{% url 'cmdb:list' %}" class="btn btn-outline-secondary btn-sm w-100">Limpar</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="asset-table">
+  {% include 'partials/asset_table.html' %}
+</div>
+{% endblock %}

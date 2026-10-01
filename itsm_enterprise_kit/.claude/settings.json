@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py check)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(python manage.py showmigrations:*)",
+      "Bash(python manage.py test:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
