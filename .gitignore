@@ -1,0 +1,15 @@
+# Ambiente
+venv/
+.venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Django
+staticfiles/
+
+# IDE
+.idea/
+.vscode/
