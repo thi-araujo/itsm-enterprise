@@ -102,9 +102,17 @@ STORAGES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Upload de anexos: extensões e tamanho máximo (ver CLAUDE.md).
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+# Upload de anexos (ver CLAUDE.md). Fonte única da política: as views, os
+# forms e os templates leem daqui — não duplique a lista em outro lugar.
+ALLOWED_UPLOAD_EXTENSIONS = [
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    '.png', '.jpg', '.jpeg', '.txt', '.log', '.zip',
+]
+MAX_UPLOAD_SIZE_MB = 10
+
+# Derivados de MAX_UPLOAD_SIZE_MB — alterar só a constante acima.
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -112,6 +120,30 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'dashboard:index'
 LOGOUT_REDIRECT_URL = 'accounts:login'
+
+# Log no console. Importante: as notificações rodam dentro de try/except nas
+# views (uma falha de e-mail não deve impedir a criação do ticket), então sem
+# log essas exceções desapareceriam silenciosamente.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simples': {
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simples',
+        },
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        'apps': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}
 
 # E-mail: em desenvolvimento, as mensagens aparecem no console.
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

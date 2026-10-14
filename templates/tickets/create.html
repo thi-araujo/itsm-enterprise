@@ -54,7 +54,7 @@
           </label>
           {{ form.attachment }}
           <div style="font-size:.72rem;color:var(--itsm-muted);margin-top:.35rem;">
-            PDF, DOC, XLS, PNG, JPG, TXT, ZIP — máx. 10MB
+            {{ upload_extensions }} — máx. {{ upload_max_mb }}MB
           </div>
         </div>
 

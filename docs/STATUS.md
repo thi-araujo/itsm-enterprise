@@ -29,6 +29,10 @@
 - [x] Badges da sidebar (notificações não lidas, tickets sem técnico)
 - [x] Mover `CLAUDE.md`, `docs/` e `.claude/` para a raiz — estavam em `itsm_enterprise_kit/`,
       então o Claude Code não lia as regras nem os slash commands
+- [x] Política de upload centralizada em `settings.py` (estava duplicada em 5 lugares)
+- [x] Avisar o usuário quando um anexo é rejeitado — antes era descartado em silêncio
+- [x] `db.sqlite3` e `media/` fora do git (`.gitignore` + `git rm --cached`)
+- [x] Trocar `except Exception: pass` por `logger.exception` em `tickets/views.py`
 
 ### 3.1 — RBAC
 - [ ] Model `UserProfile` com perfil: solicitante, tecnico, gerente, admin

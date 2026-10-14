@@ -1,0 +1,8 @@
+{% comment %}
+Erro de validação de anexo. Devolvido pela view upload_attachment com os
+cabeçalhos HX-Retarget/HX-Reswap apontando para #attach-error, para não
+substituir a lista de anexos.
+{% endcomment %}
+<div class="alert alert-danger py-2 px-3 mb-0" style="font-size:.78rem;">
+  <i class="bi bi-exclamation-triangle me-1"></i>{{ erro }}
+</div>

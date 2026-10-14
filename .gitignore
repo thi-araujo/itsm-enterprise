@@ -9,6 +9,8 @@ __pycache__/
 
 # Django
 staticfiles/
+db.sqlite3
+media/
 
 # IDE
 .idea/

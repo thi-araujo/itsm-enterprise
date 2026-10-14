@@ -5,11 +5,45 @@ from django.contrib import messages
 from django.http import HttpResponse, Http404
 from django.db.models import Q
 from django.conf import settings
+import logging
 import os
 
-from django.conf import settings
 from .models import Ticket, Comment, Category, Attachment
 from .forms import TicketForm, TicketUpdateForm, CommentForm
+
+logger = logging.getLogger(__name__)
+
+
+def _validar_anexo(arquivo):
+    """Valida extensão e tamanho de um arquivo enviado.
+
+    Devolve (True, None) se o arquivo é aceito, ou (False, mensagem) com o
+    texto pronto para exibir ao usuário. A política vem de
+    settings.ALLOWED_UPLOAD_EXTENSIONS / MAX_UPLOAD_SIZE_MB.
+    """
+    ext = os.path.splitext(arquivo.name)[1].lower()
+    if ext not in settings.ALLOWED_UPLOAD_EXTENSIONS:
+        permitidas = ', '.join(settings.ALLOWED_UPLOAD_EXTENSIONS)
+        rotulo = f'"{ext}"' if ext else 'arquivo sem extensão'
+        return False, f'Tipo não permitido: {rotulo}. Aceitos: {permitidas}.'
+
+    limite = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if arquivo.size > limite:
+        tamanho = arquivo.size / (1024 * 1024)
+        return False, (f'Arquivo muito grande ({tamanho:.1f} MB). '
+                       f'Máximo: {settings.MAX_UPLOAD_SIZE_MB} MB.')
+    return True, None
+
+
+def _politica_de_upload():
+    """Política de upload formatada para os templates (accept, rótulo, limite)."""
+    return {
+        'upload_accept':     ','.join(settings.ALLOWED_UPLOAD_EXTENSIONS),
+        'upload_extensions': ', '.join(e.lstrip('.').upper()
+                                       for e in settings.ALLOWED_UPLOAD_EXTENSIONS),
+        'upload_max_mb':     settings.MAX_UPLOAD_SIZE_MB,
+    }
+
 
 @login_required
 def ticket_list(request):
@@ -60,6 +94,7 @@ def ticket_detail(request, pk):
         'update_form':  update_form,
         'comments':     comments,
         'attachments':  attachments,
+        **_politica_de_upload(),
     }
     return render(request, 'tickets/detail.html', context)
 
@@ -77,28 +112,32 @@ def ticket_create(request):
                 from apps.notifications.email import notify_ticket_created
                 notify_ticket_created(ticket)
             except Exception:
-                pass
-            # Processa anexo opcional
-            f = request.FILES.get('attachment')
-            if f:
-                ext     = os.path.splitext(f.name)[1].lower()
-                allowed = getattr(settings, 'ALLOWED_UPLOAD_EXTENSIONS',
-                          ['.pdf','.doc','.docx','.xls','.xlsx',
-                           '.png','.jpg','.jpeg','.txt','.log','.zip'])
-                max_mb  = getattr(settings, 'MAX_UPLOAD_SIZE_MB', 10)
-                if ext in allowed and f.size <= max_mb * 1024 * 1024:
+                logger.exception('Falha ao notificar criação do ticket #%s', ticket.pk)
+
+            messages.success(request, f'Ticket #{ticket.pk:04d} criado com sucesso!')
+
+            # Anexo opcional: se for rejeitado, o ticket continua criado, mas o
+            # usuário precisa saber que o arquivo não foi salvo.
+            arquivo = request.FILES.get('attachment')
+            if arquivo:
+                aceito, erro = _validar_anexo(arquivo)
+                if aceito:
                     Attachment.objects.create(
                         ticket=ticket,
                         uploaded_by=request.user,
-                        file=f,
-                        filename=f.name,
-                        file_size=f.size,
+                        file=arquivo,
+                        filename=arquivo.name,
+                        file_size=arquivo.size,
                     )
-            messages.success(request, f'Ticket #{ticket.pk:04d} criado com sucesso!')
+                else:
+                    messages.error(request, f'O anexo NÃO foi salvo. {erro}')
+
             return redirect('tickets:detail', pk=ticket.pk)
     else:
         form = TicketForm()
-    return render(request, 'tickets/create.html', {'form': form})
+
+    context = {'form': form, **_politica_de_upload()}
+    return render(request, 'tickets/create.html', context)
 
 
 @login_required
@@ -115,7 +154,7 @@ def ticket_update_status(request, pk):
                 if updated.status == 'resolved':
                     notify_ticket_resolved(updated)
             except Exception:
-                pass
+                logger.exception('Falha ao notificar atualização do ticket #%s', pk)
             messages.success(request, 'Ticket atualizado!')
     return redirect('tickets:detail', pk=pk)
 
@@ -134,7 +173,7 @@ def add_comment(request, pk):
                 from apps.notifications.email import notify_comment_added
                 notify_comment_added(comment)
             except Exception:
-                pass
+                logger.exception('Falha ao notificar comentário no ticket #%s', pk)
             if request.htmx:
                 return render(request, 'partials/comment_item.html', {'comment': comment})
     return redirect('tickets:detail', pk=pk)
@@ -142,29 +181,33 @@ def add_comment(request, pk):
 
 @login_required
 def upload_attachment(request, pk):
-    ticket  = get_object_or_404(Ticket, pk=pk)
+    ticket = get_object_or_404(Ticket, pk=pk)
     if request.method == 'POST' and request.FILES.get('file'):
-        f       = request.FILES['file']
-        ext     = os.path.splitext(f.name)[1].lower()
-        allowed = ['.pdf', '.doc', '.docx', '.xls', '.xlsx',
-                   '.png', '.jpg', '.jpeg', '.txt', '.log', '.zip']
-        max_mb  = 10
+        arquivo      = request.FILES['file']
+        aceito, erro = _validar_anexo(arquivo)
 
-        if ext not in allowed:
-            messages.error(request, f'Tipo não permitido: {ext}')
-        elif f.size > max_mb * 1024 * 1024:
-            messages.error(request, f'Arquivo muito grande. Máximo: {max_mb}MB')
+        if not aceito:
+            if request.htmx:
+                # O formulário usa hx-swap="beforeend" em #attachments-list.
+                # Sem retarget, o redirect do fim desta view faria o HTMX
+                # injetar a página inteira dentro da lista de anexos.
+                resposta = render(request, 'partials/attachment_error.html',
+                                  {'erro': erro})
+                resposta['HX-Retarget'] = '#attach-error'
+                resposta['HX-Reswap']   = 'innerHTML'
+                return resposta
+            messages.error(request, erro)
         else:
             att = Attachment.objects.create(
                 ticket=ticket,
                 uploaded_by=request.user,
-                file=f,
-                filename=f.name,
-                file_size=f.size,
+                file=arquivo,
+                filename=arquivo.name,
+                file_size=arquivo.size,
             )
             if request.htmx:
                 return render(request, 'partials/attachment_item.html', {'att': att})
-            messages.success(request, f'"{f.name}" enviado com sucesso!')
+            messages.success(request, f'"{arquivo.name}" enviado com sucesso!')
     return redirect('tickets:detail', pk=pk)
 
 

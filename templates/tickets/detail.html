@@ -61,18 +61,21 @@
               hx-target="#attachments-list"
               hx-swap="beforeend"
               hx-encoding="multipart/form-data"
+              hx-on::before-request="document.getElementById('attach-error').innerHTML = ''"
               hx-on::after-request="this.reset(); document.getElementById('attach-zone').classList.add('d-none')">
           {% csrf_token %}
           <div class="d-flex gap-2">
             <input type="file" name="file" class="form-control form-control-sm"
-                   accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.log,.zip" required>
+                   accept="{{ upload_accept }}" required>
             <button type="submit" class="btn btn-itsm btn-sm" style="white-space:nowrap;">
               <i class="bi bi-upload me-1"></i>Enviar
             </button>
           </div>
           <div style="font-size:.72rem;color:var(--itsm-muted);margin-top:.4rem;">
-            PDF, DOC, XLS, PNG, JPG, TXT, ZIP — máx. 10MB
+            {{ upload_extensions }} — máx. {{ upload_max_mb }}MB
           </div>
+          {# Preenchido por partials/attachment_error.html via HX-Retarget #}
+          <div id="attach-error" style="margin-top:.5rem;"></div>
         </form>
       </div>
 

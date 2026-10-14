@@ -1,4 +1,6 @@
 from django import forms
+from django.conf import settings
+
 from .models import Ticket, Comment
 
 
@@ -9,7 +11,8 @@ class TicketForm(forms.ModelForm):
         label='Anexar arquivo (opcional)',
         widget=forms.FileInput(attrs={
             'class': 'form-control',
-            'accept': '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.log,.zip'
+            # Mesma lista usada na validação da view (ver settings.py).
+            'accept': ','.join(settings.ALLOWED_UPLOAD_EXTENSIONS),
         })
     )
 
