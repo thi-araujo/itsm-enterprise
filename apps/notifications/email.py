@@ -1,7 +1,11 @@
+import logging
+
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.models import User
 from .models import Notification
+
+logger = logging.getLogger(__name__)
 
 
 def _create_notification(user, ntype, title, message, ticket_id=None):
@@ -12,6 +16,11 @@ def _create_notification(user, ntype, title, message, ticket_id=None):
 
 
 def _send_email(subject, body, recipients):
+    """Envia um e-mail sem deixar que uma falha interrompa o fluxo do ticket.
+
+    A exceção é registrada no log, nunca propagada: criar um chamado não pode
+    falhar porque o servidor de e-mail está fora do ar.
+    """
     if not recipients:
         return
     try:
@@ -20,10 +29,13 @@ def _send_email(subject, body, recipients):
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=recipients,
-            fail_silently=True,
+            # fail_silently=False de propósito. Com True, o Django engole os
+            # erros de SMTP antes do except abaixo e a falha não deixa rastro
+            # nenhum — perigoso quando apontarmos para o SMTP real.
+            fail_silently=False,
         )
-    except Exception as e:
-        print(f"[ITSM EMAIL] Erro: {e}")
+    except Exception:
+        logger.exception('Falha ao enviar e-mail "%s" para %s', subject, recipients)
 
 
 def notify_ticket_created(ticket):
