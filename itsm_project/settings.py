@@ -4,6 +4,7 @@ Recriado em 2026-10-01 — a pasta itsm_project/ havia sido perdida
 (não existia em disco nem no histórico do git).
 """
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -172,6 +173,81 @@ SLA_WARNING_PERCENT = 80
 SLA_AUTO_ESCALATE = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ──────────────────────────────────────────────────────────────────
+# Integração com AD/LDAP (Fase 3.8) — ver docs/AD_LDAP.md
+#
+# A ordem desta lista importa: o Django tenta um backend por vez, na ordem,
+# até algum devolver um usuário. O LDAP vem primeiro; o ModelBackend (senha
+# guardada no banco) fica atrás como rede de segurança, para o controlador
+# de domínio cair sem trancar ninguém fora do sistema.
+# ──────────────────────────────────────────────────────────────────
+AUTHENTICATION_BACKENDS = [
+    'apps.accounts.ldap_backend.LdapBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Desligado por padrão. Com False, o LdapBackend sai na primeira linha — sem
+# socket, sem espera. Ligue depois de validar a configuração com
+# `python manage.py ldap_check`.
+LDAP_ENABLED = os.environ.get('ITSM_LDAP_ENABLED', '').lower() in ('1', 'true', 'sim')
+
+LDAP_SERVER = os.environ.get('ITSM_LDAP_SERVER', 'dc01.exemplo.local')
+LDAP_DOMAIN = os.environ.get('ITSM_LDAP_DOMAIN', 'exemplo.local')
+LDAP_SEARCH_BASE = os.environ.get('ITSM_LDAP_SEARCH_BASE', 'DC=exemplo,DC=local')
+
+# 636 = LDAPS (TLS desde o primeiro byte). 389 é LDAP puro, e num bind simples
+# as credenciais vão **em texto claro** pela rede — legíveis em qualquer
+# captura de pacotes. Use 389 apenas com LDAP_START_TLS = True.
+LDAP_PORT = int(os.environ.get('ITSM_LDAP_PORT', '636'))
+LDAP_USE_SSL = LDAP_PORT == 636
+LDAP_START_TLS = os.environ.get('ITSM_LDAP_START_TLS', '').lower() in ('1', 'true', 'sim')
+
+# Validar o certificado do DC é o padrão. Certificado de AD normalmente é
+# emitido por uma CA interna, que o Windows conhece e o Python não: exporte-a
+# e aponte o arquivo em LDAP_CA_CERT_FILE. Desligar a validação conecta de
+# qualquer jeito, mas aceita qualquer servidor que se diga o DC.
+LDAP_TLS_VALIDATE = os.environ.get('ITSM_LDAP_TLS_VALIDATE', '1') != '0'
+LDAP_CA_CERT_FILE = os.environ.get('ITSM_LDAP_CA_CERT_FILE', '')
+
+# Segundos. Baixo de propósito: este tempo é esperado na tela de login quando
+# o DC não responde.
+LDAP_TIMEOUT = int(os.environ.get('ITSM_LDAP_TIMEOUT', '5'))
+
+# Conta de serviço — opcional. Em branco (o padrão), a leitura dos atributos
+# é feita com a conexão do próprio usuário que está entrando, o que dispensa
+# guardar qualquer credencial. Se o seu AD restringir essa leitura, preencha
+# por **variável de ambiente**: senha de serviço não entra em arquivo
+# versionado.
+LDAP_BIND_DN = os.environ.get('ITSM_LDAP_BIND_DN', '')
+LDAP_BIND_PASSWORD = os.environ.get('ITSM_LDAP_BIND_PASSWORD', '')
+
+# `{username}` é substituído pelo que a pessoa digitou (já escapado).
+# `sAMAccountName` é o nome de logon curto do AD — o mesmo que ela usa no
+# Windows.
+LDAP_USER_FILTER = '(&(objectClass=user)(sAMAccountName={username}))'
+
+# Grupo do AD → papel do ITSM. Lista **ordenada**: o primeiro que casar vence,
+# então o papel mais privilegiado vem primeiro.
+#
+# Os nomes abaixo são um palpite. Descubra os seus com
+# `python manage.py ldap_check --user <seu-usuario>`, que imprime os grupos
+# reais da conta, e ajuste esta lista.
+LDAP_GROUP_ROLE_MAP = [
+    ('ITSM-Admins',    'admin'),
+    ('Domain Admins',  'admin'),
+    ('ITSM-Gerentes',  'manager'),
+    ('ITSM-Tecnicos',  'technician'),
+]
+
+# Papel de quem autentica no AD mas não está em nenhum grupo do mapa.
+# Solicitante é o menor privilégio.
+LDAP_DEFAULT_ROLE = 'requester'
+
+# Seguir grupos aninhados (grupo que é membro de outro grupo). Custa uma
+# consulta a mais por login; ligue se a sua estrutura de grupos usa
+# aninhamento.
+LDAP_NESTED_GROUPS = False
 
 # Autenticação — nomes de URL definidos em accounts/urls.py e dashboard/urls.py.
 LOGIN_URL = 'accounts:login'

@@ -37,6 +37,15 @@ class UserProfile(models.Model):
     department = models.CharField(max_length=100, blank=True,
                                   verbose_name="Departamento")
 
+    # Integração com o Active Directory (Fase 3.8). Marcar a origem da conta
+    # importa na operação: a senha de quem vem do AD é trocada no domínio, não
+    # aqui, e o papel dessa pessoa pode ser reescrito pelos grupos no próximo
+    # login — mexer no papel pelo /admin/ não se sustentaria.
+    from_ldap = models.BooleanField(default=False,
+                                    verbose_name="Conta do Active Directory")
+    ldap_last_sync = models.DateTimeField(null=True, blank=True,
+                                          verbose_name="Última sincronização com o AD")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

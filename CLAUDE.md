@@ -12,6 +12,7 @@ Mantenha-o curto e atualizado. Detalhes longos ficam em `docs/`.
 - **Status de cada fase:** ver @docs/STATUS.md
 - **Automações de SLA e agendamento:** ver @docs/AUTOMACAO_SLA.md
 - **API REST:** ver @docs/API.md
+- **Integração AD/LDAP:** ver @docs/AD_LDAP.md
 
 ## Regras obrigatórias
 1. O nome do sistema é **ITSM Enterprise**. A palavra "RAVEN" (e variações `raven`, `Raven`) NÃO deve existir em nenhum arquivo, classe CSS, variável, template, e-mail ou comentário.
@@ -34,6 +35,8 @@ python manage.py migrate                    # aplicar migrações
 python manage.py runserver 0.0.0.0:8000     # rodar acessível na rede local
 python manage.py check_sla                  # automações de SLA (aviso, vencimento, escalonamento)
 python manage.py check_sla --dry-run        # mostra o que faria, sem gravar
+python manage.py ldap_check                 # diagnóstico da conexão com o AD
+python manage.py ldap_check --user thiago   # testa o login e lista os grupos
 python manage.py createsuperuser            # criar admin
 ```
 
@@ -67,6 +70,11 @@ itsm_enterprise/
   comentar) vive em `apps/tickets/services.py`, **nunca** na view nem no serializer:
   a tela HTML e a API REST chamam a mesma função. As funções levantam
   `ValidationError`; cada camada traduz (a view para `messages`, a API para HTTP 400).
+- Autenticação: `AUTHENTICATION_BACKENDS` tem o LDAP na frente e o
+  `ModelBackend` atrás, nessa ordem — o controlador de domínio cair não pode
+  trancar ninguém fora. Senha de conta do AD **nunca** é gravada no Django.
+- Credencial de serviço e qualquer segredo: só por variável de ambiente
+  (`ITSM_*`), nunca em arquivo versionado.
 - Upload permitido: .pdf .doc .docx .xls .xlsx .png .jpg .jpeg .txt .log .zip — máx. 10 MB.
 - SLA por prioridade: Crítica 2h · Alta 8h · Média 24h · Baixa 72h.
 - Ticket sem técnico (`assignee` nulo) deve funcionar em TODOS os templates: use `{% if ticket.assignee %}` em vez de encadear `|default` sobre atributos de objeto nulo.

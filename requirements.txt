@@ -3,3 +3,4 @@ django-htmx>=1.17
 whitenoise>=6.6
 pillow>=10.0
 djangorestframework>=3.15
+ldap3>=2.9

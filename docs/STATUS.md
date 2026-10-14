@@ -371,5 +371,82 @@ contá-lo distorceria o cumprimento de SLA. Há teste para isso.
 KPIs e os 3 gráficos; `Paulo` sem os KPIs, com `data-pode-gerenciar="0"` e
 total 1 contra 13 da equipe.
 
-### 3.8 — pendente
-- [ ] Integração AD/LDAP
+### ✅ 3.8 — Integração AD/LDAP — Concluída
+- [x] **`ldap3` em vez de `django-auth-ldap`**: o caminho usual depende do
+      `python-ldap`, extensão em C que **não compila** nesta máquina
+      (`Unable to find a compatible Visual Studio installation`, sem wheel
+      para Windows/Python 3.14). O `ldap3` é Python puro e o backend de
+      autenticação são ~120 linhas — com o bônus de deixar o mapeamento
+      grupo → papel explícito em código
+- [x] `apps/accounts/ldap_client.py` — a única parte que sabe o que é LDAP.
+      Separado do backend justamente para os testes poderem trocá-lo
+- [x] `apps/accounts/ldap_backend.py` — `LdapBackend`, e o
+      `AUTHENTICATION_BACKENDS` com o **ModelBackend atrás**: o controlador
+      de domínio cair não pode trancar ninguém fora do sistema
+- [x] Provisionamento **just-in-time**: o usuário é criado no primeiro login
+      com nome, e-mail e departamento lidos do diretório. Sem importação em
+      massa — quem nunca entrar não ocupa linha no banco
+- [x] **Senha do AD não é guardada** (`set_unusable_password`): senão uma
+      cópia do hash ficaria no `db.sqlite3` e trocar a senha no domínio não
+      revogaria o acesso ao ITSM
+- [x] Papel pelo grupo do AD (`LDAP_GROUP_ROLE_MAP`), **lista ordenada** e não
+      dicionário: o primeiro que casar vence, então quem está em `ITSM-Admins`
+      e `ITSM-Tecnicos` sai como Administrador em vez de depender da ordem em
+      que o AD devolveu os grupos
+- [x] Busca do usuário com `iexact`: o `sAMAccountName` do AD não diferencia
+      maiúsculas e o `username` do Django sim — sem isso, o AD devolvendo
+      `Thiago` criaria uma segunda conta ao lado do `thiago` existente
+- [x] **Usuário que já existia não é rebaixado**: sem grupo casando, o papel
+      atual é mantido. Senão o `thiago` (Administrador criado à mão) viraria
+      Solicitante no primeiro login pelo AD. A senha local também é preservada
+- [x] `UserProfile.from_ldap` e `ldap_last_sync`, com a coluna **Origem**
+      ("Active Directory" / "Local") na lista de usuários do `/admin/` — antes
+      de tentar redefinir a senha de alguém por lá
+- [x] **`manage.py ldap_check`**: separa DNS, porta, TLS e bind, e o
+      `--user <conta>` imprime os **grupos reais** da pessoa e o papel que ela
+      receberia. Sem ele, configurar o mapa de grupos seria tentativa e erro
+      às cegas. A senha é pedida por `getpass`, nunca por argumento
+- [x] `apps/accounts/checks.py` — 4 avisos no `manage.py check`
+      (`ldap.W001`..`W004`) para configuração perigosa aparecer no terminal de
+      quem sobe o sistema, e não só na documentação
+- [x] Tela de login avisa "use seu usuário e senha de rede do domínio
+      exemplo.local" quando o AD está ligado
+- [x] Tudo por variável de ambiente (`ITSM_LDAP_*`) e **desligado por padrão**:
+      a suíte não toca a rede e quem clonar o projeto não trava no login
+- [x] 48 testes novos — suíte total: **341 testes**
+
+**Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
+
+**Dependência nova:** `ldap3>=2.9` (único acréscimo ao `requirements.txt`).
+
+**Levantamento real do domínio** (14/10/2026): `exemplo.local` resolve para
+`192.168.10.4`; o DC é `dc01.exemplo.local` pelo registro SRV; **LDAP na 389
+responde** e a base `DC=exemplo,DC=local` foi confirmada pelos naming contexts
+do servidor.
+
+> ⚠️ **O DC não tem certificado de servidor instalado.** A 636 abre a conexão
+> TCP e derruba o TLS (`WinError 10054`); o StartTLS na 389 responde
+> `unavailable`. Mesma causa nos dois. Desligar `ITSM_LDAP_TLS_VALIDATE`
+> **não** resolve — não há certificado para validar. O padrão do projeto
+> continua 636 com validação ligada, de propósito: instalar o AD CS
+> (Enterprise CA) faz o LDAPS passar a funcionar sem mudar nada aqui. O
+> atalho é `ITSM_LDAP_PORT=389`, com a senha de domínio em texto claro na
+> rede — e o `manage.py check` reclamando. Ver `docs/AD_LDAP.md`.
+
+**Dois testes de segurança que merecem destaque:** senha em branco não chega
+ao servidor (bind com senha vazia é bind **anônimo**, que o AD aceita — a
+autenticação "passaria" em branco); e username com curinga não casa com
+qualquer conta (o que a pessoa digita é escapado antes de entrar no filtro
+LDAP — mesma classe de problema que SQL injection).
+
+**Não implementado, de propósito:** SSO (Kerberos/SPNEGO) exigiria `gssapi`
+— outra extensão em C, mesmo problema do `python-ldap` — e que a máquina
+estivesse no domínio (esta está em `WORKGROUP`). Desativação automática de
+conta demitida exigiria rotina periódica, como o `check_sla`.
+
+### Pendência desta fase
+- Conta desabilitada no AD deixa de autenticar, mas segue existindo e
+  aparecendo nos seletores do ITSM até alguém desativá-la no `/admin/`.
+- A aprovação por departamento (pendência da Fase 3.3) ficou **mais perto**:
+  o `UserProfile.department` agora é preenchido pelo diretório, que era o
+  dado que faltava.

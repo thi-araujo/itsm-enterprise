@@ -1,5 +1,6 @@
+from django.conf import settings
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
 
@@ -17,7 +18,14 @@ def login_view(request):
             messages.error(request, 'Usuário ou senha inválidos.')
     else:
         form = AuthenticationForm()
-    return render(request, 'accounts/login.html', {'form': form})
+
+    # Com o AD ligado (Fase 3.8), a tela avisa que a senha esperada é a do
+    # domínio — senão a pessoa tenta uma senha local que o sistema nem guarda.
+    return render(request, 'accounts/login.html', {
+        'form': form,
+        'ldap_ativo': settings.LDAP_ENABLED,
+        'ldap_dominio': settings.LDAP_DOMAIN,
+    })
 
 
 def logout_view(request):
