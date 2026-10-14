@@ -14,7 +14,7 @@
         </td>
         <td style="font-size:.8rem;color:var(--itsm-muted);">{{ t.get_ticket_type_display }}</td>
         <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
-        <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--itsm-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+        <td><span class="status-badge status-{{ t.status }}">{{ t.get_status_display }}</span></td>
         <td style="font-size:.8rem;color:var(--itsm-muted);">{% if t.assignee %}{{ t.assignee.username }}{% else %}—{% endif %}</td>
         <td>
           {% if t.sla_deadline %}

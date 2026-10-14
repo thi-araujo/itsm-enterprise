@@ -126,7 +126,7 @@
             <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">#{{ t.pk|stringformat:"04d" }}</a></td>
             <td style="font-size:.85rem;">{{ t.title|truncatechars:45 }}</td>
             <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
-            <td><span class="status-badge" style="background:rgba(79,142,247,.1);color:var(--itsm-accent);border:1px solid rgba(79,142,247,.3);">{{ t.get_status_display }}</span></td>
+            <td><span class="status-badge status-{{ t.status }}">{{ t.get_status_display }}</span></td>
             <td style="font-size:.78rem;color:var(--itsm-muted);">{{ t.created_at|date:"d/m/Y" }}</td>
           </tr>
           {% empty %}

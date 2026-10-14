@@ -40,14 +40,31 @@
 - [x] Renomear "ITSM PRO" → "ITSM Enterprise" em 11 templates (12 ocorrências)
 - [x] Primeira suíte de testes: 46 testes nos 6 apps (`python manage.py test`)
 
-### Pendências conhecidas (não bloqueiam a Fase 3.1)
-- Classes CSS `itsm-card` (27 usos) e `itsm-table` (7 usos) **não existem** no CSS;
-  o que existe é `.card-itsm`, `.card-header-itsm` e `.t-itsm`, definidos e nunca usados.
-  Rename feito pela metade. **O CLAUDE.md (identidade visual) cita `itsm-card` como a
-  convenção correta**, então a correção é renomear no CSS, não nos templates.
-  Muda a aparência de todas as telas — revisar no navegador ao aplicar.
+### ✅ Correção do CSS órfão — Concluída
+O rename de classes tinha sido feito só no CSS: os templates escreviam `itsm-card`,
+`stat-card`, `priority-badge`, `ticket-id`… e o CSS definia `.card-itsm`, `.stat`,
+`.pbadge`, `.tid`. Nada estourava (o navegador ignora classe sem regra), então
+**quase toda a folha de estilo estava inerte** — as telas só tinham o `style=` inline.
+- [x] 16 grupos de seletores renomeados no `itsm.css` para o nome que os templates usam:
+      `.card-itsm`→`.itsm-card`, `.t-itsm`→`.itsm-table`, `.stat`→`.stat-card`,
+      `.stat-val/lbl/ico`→`.stat-value/label/icon`, `.pbadge`→`.priority-badge`,
+      `.sbadge`→`.status-badge`, `.p-*`→`.badge-*`, `.s-*`→`.status-*`,
+      `.tid`→`.ticket-id`, `.sla-breach`→`.sla-breached`, `.card-header-itsm`→`.itsm-card-header`
+- [x] Badge de status voltou a ter a cor do status: os 6 lugares usavam
+      `style="background:rgba(79,142,247,.1)…"` fixo (tudo azul) e agora usam
+      `class="status-badge status-{{ ticket.status }}"`
+- [x] `.toast-msg` ganhou `transition: opacity` — o JS de auto-dismiss zerava a
+      opacidade de uma vez e o aviso sumia de supetão
+- [x] 3 testes novos (`IdentidadeVisualTests`) que falham se CSS e templates
+      voltarem a divergir — suíte total: **72 testes**
+
+### Pendências conhecidas
 - Variáveis CSS canônicas são sem prefixo (`--bg`, `--text`…) e os `--itsm-*` são apelidos;
   o CLAUDE.md pede o prefixo `--itsm-`. São 83 usos sem prefixo nos templates.
+- Os templates reimplementam em `style=` inline o que o `itsm.css` já define:
+  `.itsm-card-header`, `.comment-box`, `.att-item`, `.info-row`, `.empty-state`,
+  `.section-title`, `.dot-*`, `.sla-ok`, `.sla-warn`, `.btn-outline-itsm` seguem
+  definidos e sem uso. Trocar o inline por essas classes é o próximo passo do CSS.
 - `report_dashboard` roda uma query por dia no gráfico de volume diário (até 30 queries).
 - O JS de badges segue inline no `base.html` porque usa `{% url %}` — não dá para mover
   para um arquivo .js sem passar as URLs por outro caminho.

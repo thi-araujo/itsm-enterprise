@@ -1,6 +1,9 @@
 """Testes do dashboard — foco no contador de SLA, que passou de contagem em
 memória para consulta no banco e precisa dar exatamente o mesmo resultado."""
 
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -56,3 +59,67 @@ class SlaRiskTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context['stats']['sla_risk'], 3)
         self.assertEqual(r.context['stats']['total'], 7)
+
+
+class IdentidadeVisualTests(TestCase):
+    """Garante que as classes da identidade visual existam no CSS *e* nos
+    templates.
+
+    Motivo: um rename feito pela metade deixou o CSS chamando `.card-itsm`
+    enquanto os templates escreviam `itsm-card`. Nada estourava — o navegador
+    simplesmente ignora uma classe sem regra — e as telas ficavam sem estilo.
+    Este teste falha se os dois lados voltarem a divergir.
+    """
+
+    # Classes de componente do projeto (as do Bootstrap ficam de fora).
+    CLASSES = [
+        'itsm-card', 'itsm-table',
+        'stat-card', 'stat-value', 'stat-label', 'stat-icon',
+        'priority-badge', 'status-badge', 'ticket-id', 'sla-breached',
+        'btn-itsm', 'toast-msg',
+    ]
+
+    # Classes montadas no template a partir do valor do campo
+    # (ex.: class="priority-badge badge-{{ t.priority }}"), por isso só
+    # podem ser conferidas no CSS.
+    CLASSES_DINAMICAS = [
+        'badge-low', 'badge-medium', 'badge-high', 'badge-critical',
+        'status-open', 'status-in_progress', 'status-waiting',
+        'status-resolved', 'status-closed',
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.css = (Path(settings.BASE_DIR) / 'static' / 'css' / 'itsm.css').read_text(encoding='utf-8')
+        cls.templates = '\n'.join(
+            caminho.read_text(encoding='utf-8')
+            for caminho in (Path(settings.BASE_DIR) / 'templates').rglob('*.html')
+        )
+
+    def test_toda_classe_do_css_tem_regra_e_uso(self):
+        for classe in self.CLASSES:
+            with self.subTest(classe=classe):
+                self.assertIn('.%s' % classe, self.css,
+                              '%s é usada nos templates mas não tem regra no itsm.css' % classe)
+                self.assertIn(classe, self.templates,
+                              '%s tem regra no itsm.css mas nenhum template usa' % classe)
+
+    def test_classes_dinamicas_tem_regra(self):
+        for classe in self.CLASSES_DINAMICAS:
+            with self.subTest(classe=classe):
+                self.assertIn('.%s' % classe, self.css)
+
+    def test_badge_de_status_usa_a_cor_do_status(self):
+        """Antes todo status saía azul, com a cor fixa no `style=` inline."""
+        user = criar_admin('visual')
+        aberto = Ticket.objects.create(title='Aberto', description='d',
+                                       requester=user, priority='low')
+        resolvido = Ticket.objects.create(title='Resolvido', description='d',
+                                          requester=user, priority='low',
+                                          status='resolved')
+        self.client.force_login(user)
+        html = self.client.get(reverse('tickets:list')).content.decode()
+        self.assertIn('status-badge status-open', html)
+        self.assertIn('status-badge status-resolved', html)
+        self.assertEqual(aberto.status, 'open')
+        self.assertEqual(resolvido.status, 'resolved')

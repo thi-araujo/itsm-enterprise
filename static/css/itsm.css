@@ -5,6 +5,11 @@
 
    Convenção: tema escuro, fonte Sora (texto) e JetBrains Mono
    (IDs e números). Ver "Identidade visual" no CLAUDE.md.
+
+   Os nomes dos seletores são os que os templates realmente usam
+   (.itsm-card, .itsm-table, .stat-card, .priority-badge, .ticket-id…).
+   Antes havia nomes abreviados que não batiam com os templates, então
+   as regras não pegavam em nada.
    ============================================================ */
 
 :root {
@@ -81,46 +86,46 @@ body { background: var(--bg); color: var(--text); font-family: 'Sora', sans-seri
 .page { padding: 1.5rem; flex: 1; }
 
 /* ── Cards ── */
-.card-itsm { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-.card-itsm .card-header-itsm {
+.itsm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.itsm-card .itsm-card-header {
     padding: .85rem 1.25rem; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
 }
-.card-header-itsm .title { font-weight: 600; font-size: .88rem; display: flex; align-items: center; gap: .5rem; }
-.card-header-itsm .title i { color: var(--accent); }
+.itsm-card-header .title { font-weight: 600; font-size: .88rem; display: flex; align-items: center; gap: .5rem; }
+.itsm-card-header .title i { color: var(--accent); }
 
 /* ── Stat cards ── */
-.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; position: relative; overflow: hidden; transition: border-color .2s; }
-.stat:hover { border-color: rgba(59,130,246,.4); }
-.stat-val { font-family: 'JetBrains Mono', monospace; font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
-.stat-lbl { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: .3rem; }
-.stat-ico { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); font-size: 2.4rem; opacity: .07; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; position: relative; overflow: hidden; transition: border-color .2s; }
+.stat-card:hover { border-color: rgba(59,130,246,.4); }
+.stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
+.stat-label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: .3rem; }
+.stat-icon { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); font-size: 2.4rem; opacity: .07; }
 
 /* ── Priority / Status badges ── */
-.p-low      { background: rgba(16,185,129,.12); color: #34d399; border: 1px solid rgba(16,185,129,.25); }
-.p-medium   { background: rgba(245,158,11,.12); color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
-.p-high     { background: rgba(239,68,68,.12);  color: #f87171; border: 1px solid rgba(239,68,68,.25); }
-.p-critical { background: rgba(124,58,237,.15); color: #c4b5fd; border: 1px solid rgba(124,58,237,.3); }
-.pbadge, .sbadge {
+.badge-low      { background: rgba(16,185,129,.12); color: #34d399; border: 1px solid rgba(16,185,129,.25); }
+.badge-medium   { background: rgba(245,158,11,.12); color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
+.badge-high     { background: rgba(239,68,68,.12);  color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+.badge-critical { background: rgba(124,58,237,.15); color: #c4b5fd; border: 1px solid rgba(124,58,237,.3); }
+.priority-badge, .status-badge {
     font-family: 'JetBrains Mono', monospace; font-size: .68rem; padding: .2rem .5rem;
     border-radius: 4px; font-weight: 600; letter-spacing: .3px; display: inline-block;
 }
-.s-open        { background: rgba(59,130,246,.12);  color: #60a5fa; border: 1px solid rgba(59,130,246,.25); }
-.s-in_progress { background: rgba(6,182,212,.12);   color: #22d3ee; border: 1px solid rgba(6,182,212,.25); }
-.s-waiting     { background: rgba(245,158,11,.12);  color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
-.s-resolved    { background: rgba(16,185,129,.12);  color: #34d399; border: 1px solid rgba(16,185,129,.25); }
-.s-closed      { background: rgba(100,116,139,.12); color: #94a3b8; border: 1px solid rgba(100,116,139,.25); }
+.status-open        { background: rgba(59,130,246,.12);  color: #60a5fa; border: 1px solid rgba(59,130,246,.25); }
+.status-in_progress { background: rgba(6,182,212,.12);   color: #22d3ee; border: 1px solid rgba(6,182,212,.25); }
+.status-waiting     { background: rgba(245,158,11,.12);  color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
+.status-resolved    { background: rgba(16,185,129,.12);  color: #34d399; border: 1px solid rgba(16,185,129,.25); }
+.status-closed      { background: rgba(100,116,139,.12); color: #94a3b8; border: 1px solid rgba(100,116,139,.25); }
 
 /* ── Table ── */
-.t-itsm { color: var(--text); width: 100%; }
-.t-itsm thead th {
+.itsm-table { color: var(--text); width: 100%; }
+.itsm-table thead th {
     background: rgba(59,130,246,.04); border-bottom: 1px solid var(--border);
     color: var(--muted); font-size: .68rem; text-transform: uppercase; letter-spacing: 1.5px;
     padding: .65rem .85rem; font-weight: 600;
 }
-.t-itsm tbody td { border-bottom: 1px solid rgba(28,37,64,.6); padding: .6rem .85rem; vertical-align: middle; }
-.t-itsm tbody tr:hover td { background: rgba(59,130,246,.03); }
-.t-itsm tbody tr:last-child td { border-bottom: none; }
+.itsm-table tbody td { border-bottom: 1px solid rgba(28,37,64,.6); padding: .6rem .85rem; vertical-align: middle; }
+.itsm-table tbody tr:hover td { background: rgba(59,130,246,.03); }
+.itsm-table tbody tr:last-child td { border-bottom: none; }
 
 /* ── Forms ── */
 .form-control, .form-select {
@@ -143,12 +148,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Sora', sans-seri
 .btn-outline-itsm:hover { border-color: var(--accent); color: var(--text); background: rgba(59,130,246,.07); }
 
 /* ── Ticket ID ── */
-.tid { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: .78rem; font-weight: 600; }
+.ticket-id { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: .78rem; font-weight: 600; }
 
 /* ── SLA ── */
 .sla-ok      { color: var(--success); font-size: .78rem; }
 .sla-warn    { color: var(--warning); font-size: .78rem; }
-.sla-breach  { color: var(--danger);  font-size: .78rem; animation: pulse 2s infinite; }
+.sla-breached  { color: var(--danger);  font-size: .78rem; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
 /* ── Comment ── */
@@ -174,6 +179,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Sora', sans-seri
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Toast de mensagens (o resto do estilo está inline no base.html) ── */
+.toast-msg { transition: opacity .4s ease; }
 
 /* ── Misc ── */
 .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
