@@ -434,11 +434,11 @@ total 1 contra 13 da equipe.
 responde** e a base `DC=exemplo,DC=local` foi confirmada pelos naming contexts
 do servidor. **Bind real validado** com `joao.silva` na 389: 7 grupos
 lidos, papel resolvido como Administrador. **O `LDAP_GROUP_ROLE_MAP` tem só
-`Domain Admins`**: os grupos `GRP-*` do domínio são do File Server e são
-concedidos por GPO, então mapeá-los daria privilégio de atendimento a quem só
-recebeu acesso a um compartilhamento. O papel de Técnico/Gerente é dado à mão
+`Domain Admins`**: no levantamento, todos os grupos do domínio (fora os
+internos do Windows) eram de File Server, concedidos por GPO — mapeá-los daria
+privilégio de atendimento a quem só recebeu acesso a um compartilhamento. O papel de Técnico/Gerente é dado à mão
 em /admin/, e o login seguinte não desfaz (sem grupo casando, o papel atual é
-mantido). `MapaDeGruposDoProjetoTests` falha se um `GRP-*` voltar ao mapa.
+mantido). `MapaDeGruposDoProjetoTests` falha quando o mapa cresce.
 
 > ⚠️ **O DC não tem certificado de servidor instalado.** A 636 abre a conexão
 > TCP e derruba o TLS (`WinError 10054`); o StartTLS na 389 responde

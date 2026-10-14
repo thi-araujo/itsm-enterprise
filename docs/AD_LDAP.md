@@ -136,13 +136,20 @@ LDAP_GROUP_ROLE_MAP = [
 LDAP_DEFAULT_ROLE = 'requester'
 ```
 
-**Só um grupo, e isso é deliberado.** Os grupos `GRP-*` do domínio
-`exemplo.local` (`GRP-Geral`, `GRP-Arquivos`, `GRP-Documentos`, `GRP-Cofre`,
-`GRP-Technical`, `GRP-Admins`) são do **File Server** e são concedidos por
-**GPO, automaticamente**. Ligar `GRP-Technical` ao papel de Técnico daria
-privilégio de atendimento a quem só recebeu acesso a um compartilhamento —
-escalonamento de privilégio pela GPO, sem ninguém ter decidido isso. Há um
-teste (`MapaDeGruposDoProjetoTests`) que falha se algum deles voltar ao mapa.
+**Só um grupo, e isso é deliberado.** Num domínio real a maioria dos grupos
+existe para conceder acesso a compartilhamentos, impressoras e aplicações, e é
+distribuída por **GPO, automaticamente** — foi o que apareceu no levantamento
+deste projeto, em que todos os grupos do domínio, menos os internos do
+Windows, eram de File Server.
+
+Mapear um desses para um papel do ITSM daria privilégio de atendimento a quem
+só recebeu acesso a uma pasta: **escalonamento de privilégio pela GPO**, sem
+ninguém ter decidido isso. É uma armadilha fácil, porque o nome do grupo
+costuma sugerir função (`GRP-Technical` parece ser "o grupo dos técnicos",
+e é a lista de quem acessa o compartilhamento da equipe técnica).
+
+Há um teste (`MapaDeGruposDoProjetoTests`) que falha quando o mapa cresce —
+não para impedir o acréscimo, mas para que ele passe por uma revisão.
 
 Então o fluxo é:
 
@@ -349,9 +356,9 @@ Dois testes merecem destaque porque fixam comportamentos de segurança:
 - **senha em branco não chega ao servidor.** Bind com senha vazia é um bind
   **anônimo**, que o AD aceita — a autenticação "passaria" com a senha em
   branco. Há guarda no backend e no cliente.
-- **grupo de File Server não concede papel.** `MapaDeGruposDoProjetoTests`
+- **o mapa de grupos não cresce em silêncio.** `MapaDeGruposDoProjetoTests`
   verifica o mapa que está no `settings.py` de verdade, não um mapa de teste:
-  se algum `GRP-*` voltar para lá, a suíte falha.
+  qualquer grupo novo faz a suíte falhar, forçando a revisão.
 - **username com curinga não casa com qualquer conta.** O que a pessoa digita é
   escapado antes de entrar no filtro LDAP; sem isso, `*` casaria com a primeira
   conta do diretório. É a mesma classe de problema que SQL injection.

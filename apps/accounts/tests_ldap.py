@@ -589,22 +589,33 @@ class ListagemDeUsuariosTests(TestCase):
 class MapaDeGruposDoProjetoTests(TestCase):
     """O `LDAP_GROUP_ROLE_MAP` que está no settings — não um mapa de teste.
 
-    Os grupos `GRP-*` do domínio exemplo.local são do File Server e são
-    concedidos por GPO. Se algum deles entrar no mapa, quem recebeu acesso a
-    um compartilhamento ganha privilégio de atendimento no ITSM sem ninguém
-    ter decidido isso. Este teste falha se isso acontecer.
+    Num domínio real, a maioria dos grupos existe para conceder acesso a
+    compartilhamentos, impressoras e aplicações, e é distribuída por GPO
+    automaticamente. Mapear um desses para um papel do ITSM daria privilégio
+    de atendimento a quem só precisava de uma pasta — escalonamento de
+    privilégio sem ninguém ter decidido isso.
+
+    Por isso o mapa é mínimo e cada acréscimo exige revisão: só entra aqui
+    grupo criado **exatamente** para definir papel no ITSM.
     """
 
-    GRUPOS_DE_ARQUIVO = ['GRP-Geral', 'GRP-Arquivos', 'GRP-Documentos',
-                         'GRP-Cofre', 'GRP-Technical', 'GRP-Admins']
+    def test_o_mapa_nao_cresceu_sem_revisao(self):
+        """Este teste falha de propósito quando alguém acrescenta um grupo.
 
-    def test_grupo_de_file_server_nao_concede_papel(self):
-        for grupo in self.GRUPOS_DE_ARQUIVO:
+        Não é para impedir o acréscimo: é para que ele passe por aqui, onde
+        está escrito o critério.
+        """
+        self.assertEqual([grupo for grupo, _ in settings.LDAP_GROUP_ROLE_MAP],
+                         ['Domain Admins'])
+
+    def test_grupo_de_compartilhamento_nao_concede_papel(self):
+        for grupo in ['GRP-Arquivos', 'GRP-Financeiro', 'Impressoras-Andar2',
+                      'Todos-os-Usuarios', 'VPN-Usuarios']:
             with self.subTest(grupo=grupo):
                 self.assertIsNone(papel_para_grupos([grupo]))
 
-    def test_conta_so_com_grupos_de_arquivo_entra_como_solicitante(self):
-        self.assertIsNone(papel_para_grupos(self.GRUPOS_DE_ARQUIVO))
+    def test_conta_sem_grupo_mapeado_entra_como_solicitante(self):
+        self.assertIsNone(papel_para_grupos(['GRP-Arquivos', 'VPN-Usuarios']))
         self.assertEqual(settings.LDAP_DEFAULT_ROLE,
                          UserProfile.ROLE_REQUESTER)
 

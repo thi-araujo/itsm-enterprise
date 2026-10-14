@@ -7,16 +7,53 @@ Recriado em 2026-10-01 — a pasta itsm_project/ havia sido perdida
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ATENÇÃO: chave de desenvolvimento. Troque antes de ir para produção
-# e mova para uma variável de ambiente.
-SECRET_KEY = 'django-insecure-chave-de-desenvolvimento-nao-use-em-producao'
+# Lê o arquivo .env da raiz do projeto, se existir. É onde ficam os valores
+# deste ambiente (chave secreta, dados do Active Directory): o .env está no
+# .gitignore e NUNCA vai para o repositório. Use o .env.example como molde.
+load_dotenv(BASE_DIR / '.env')
 
-DEBUG = True
 
-# Permite acesso pela rede local (runserver 0.0.0.0:8000), conforme CLAUDE.md.
-ALLOWED_HOSTS = ['*']
+def _env_bool(nome, padrao=False):
+    """Lê uma variável de ambiente como booleano.
+
+    Toda variável de ambiente é texto: sem isto, `ITSM_LDAP_ENABLED=0` seria
+    a string "0", que em Python é verdadeira — o oposto da intenção.
+    """
+    valor = os.environ.get(nome)
+    if valor is None:
+        return padrao
+    return valor.strip().lower() in ('1', 'true', 'sim', 'yes', 'on')
+
+
+DEBUG = _env_bool('ITSM_DEBUG', True)
+
+# Chave de assinatura de sessões, cookies e tokens de redefinição de senha.
+# O valor abaixo é só para desenvolvimento; em produção venha do ambiente.
+SECRET_KEY = os.environ.get(
+    'ITSM_SECRET_KEY',
+    'django-insecure-chave-de-desenvolvimento-nao-use-em-producao',
+)
+
+# Rede de segurança: subir com DEBUG=False e a chave de desenvolvimento
+# deixaria as sessões assináveis por qualquer pessoa que leia este arquivo
+# público. Falhar ao iniciar é melhor que rodar vulnerável em silêncio.
+if not DEBUG and SECRET_KEY.startswith('django-insecure'):
+    raise ImproperlyConfigured(
+        'Defina ITSM_SECRET_KEY no ambiente antes de rodar com DEBUG=False. '
+        'Gere uma com: python -c "from django.core.management.utils import '
+        'get_random_secret_key; print(get_random_secret_key())"'
+    )
+
+# Em desenvolvimento, '*' permite abrir pelo IP da máquina na rede local
+# (runserver 0.0.0.0:8000). Em produção, liste os domínios de verdade:
+# ITSM_ALLOWED_HOSTS=itsm.suaempresa.com,10.0.0.50
+ALLOWED_HOSTS = [h.strip() for h in
+                 os.environ.get('ITSM_ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -190,7 +227,7 @@ AUTHENTICATION_BACKENDS = [
 # Desligado por padrão. Com False, o LdapBackend sai na primeira linha — sem
 # socket, sem espera. Ligue depois de validar a configuração com
 # `python manage.py ldap_check`.
-LDAP_ENABLED = os.environ.get('ITSM_LDAP_ENABLED', '').lower() in ('1', 'true', 'sim')
+LDAP_ENABLED = _env_bool('ITSM_LDAP_ENABLED')
 
 LDAP_SERVER = os.environ.get('ITSM_LDAP_SERVER', 'dc01.exemplo.local')
 LDAP_DOMAIN = os.environ.get('ITSM_LDAP_DOMAIN', 'exemplo.local')
@@ -201,13 +238,13 @@ LDAP_SEARCH_BASE = os.environ.get('ITSM_LDAP_SEARCH_BASE', 'DC=exemplo,DC=local'
 # captura de pacotes. Use 389 apenas com LDAP_START_TLS = True.
 LDAP_PORT = int(os.environ.get('ITSM_LDAP_PORT', '636'))
 LDAP_USE_SSL = LDAP_PORT == 636
-LDAP_START_TLS = os.environ.get('ITSM_LDAP_START_TLS', '').lower() in ('1', 'true', 'sim')
+LDAP_START_TLS = _env_bool('ITSM_LDAP_START_TLS')
 
 # Validar o certificado do DC é o padrão. Certificado de AD normalmente é
 # emitido por uma CA interna, que o Windows conhece e o Python não: exporte-a
 # e aponte o arquivo em LDAP_CA_CERT_FILE. Desligar a validação conecta de
 # qualquer jeito, mas aceita qualquer servidor que se diga o DC.
-LDAP_TLS_VALIDATE = os.environ.get('ITSM_LDAP_TLS_VALIDATE', '1') != '0'
+LDAP_TLS_VALIDATE = _env_bool('ITSM_LDAP_TLS_VALIDATE', True)
 LDAP_CA_CERT_FILE = os.environ.get('ITSM_LDAP_CA_CERT_FILE', '')
 
 # Segundos. Baixo de propósito: este tempo é esperado na tela de login quando
@@ -233,11 +270,15 @@ LDAP_USER_FILTER = '(&(objectClass=user)(sAMAccountName={username}))'
 # Nomes conferidos no domínio exemplo.local em 14/10/2026 com
 # `manage.py ldap_check --user joao.silva`.
 #
-# Os grupos GRP-* do domínio são do **File Server** e são concedidos por GPO,
-# automaticamente. Eles ficam FORA deste mapa de propósito: ligar
-# `GRP-Technical` ao papel de Técnico daria privilégio de atendimento a quem
-# só recebeu acesso a um compartilhamento — escalonamento de privilégio pela
-# GPO, sem ninguém ter decidido isso.
+# **Mantenha este mapa mínimo.** Num domínio real a maioria dos grupos existe
+# para conceder acesso a compartilhamentos, impressoras e aplicações, e é
+# distribuída por GPO automaticamente. Mapear um desses para um papel do ITSM
+# daria privilégio de atendimento a quem só precisava de uma pasta —
+# escalonamento de privilégio sem ninguém ter decidido isso.
+#
+# Só entra aqui grupo criado **exatamente** para definir papel no ITSM. Há um
+# teste (`MapaDeGruposDoProjetoTests`) que falha quando o mapa cresce, para o
+# acréscimo passar por uma revisão.
 #
 # Logo: só `Domain Admins` concede papel automaticamente. Todo o resto entra
 # como LDAP_DEFAULT_ROLE (Solicitante) e o papel de Técnico/Gerente é dado à
@@ -254,7 +295,7 @@ LDAP_DEFAULT_ROLE = 'requester'
 # Seguir grupos aninhados (grupo que é membro de outro grupo). Custa uma
 # consulta a mais por login; ligue se a sua estrutura de grupos usa
 # aninhamento.
-LDAP_NESTED_GROUPS = False
+LDAP_NESTED_GROUPS = _env_bool('ITSM_LDAP_NESTED_GROUPS')
 
 # Autenticação — nomes de URL definidos em accounts/urls.py e dashboard/urls.py.
 LOGIN_URL = 'accounts:login'

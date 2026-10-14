@@ -144,6 +144,7 @@ comentário, atribuição, resolução, escalonamento, aprovação e eventos de 
 | Frontend | Bootstrap 5.3 · HTMX 1.9 · Chart.js 4.4 |
 | Diretório | `ldap3` (LDAP em Python puro) |
 | Estáticos | WhiteNoise |
+| Configuração | python-dotenv (arquivo `.env`) |
 
 ---
 
@@ -177,17 +178,33 @@ python manage.py shell < seed_data.py
 > Os usuários criados pelo `seed_data.py` têm **senhas triviais, de
 > desenvolvimento**. Não use esse script em ambiente exposto.
 
-### Antes de ir para produção
+### Configuração
 
-```python
-# itsm_project/settings.py
-DEBUG = False
-ALLOWED_HOSTS = ['itsm.suaempresa.com']
-SECRET_KEY = os.environ['ITSM_SECRET_KEY']   # fora do código
+Nenhuma variável é obrigatória para desenvolvimento. Para ajustar o ambiente —
+ou ligar a integração com o Active Directory — copie o molde:
+
+```bash
+cp .env.example .env     # Windows: Copy-Item .env.example .env
 ```
 
-E troque o SQLite por PostgreSQL, o backend de e-mail de console por SMTP real
-e rode `collectstatic`.
+O `.env` está no `.gitignore`: é onde ficam os valores deste ambiente, e ele
+nunca vai para o repositório. Todas as opções estão comentadas no
+[`.env.example`](.env.example).
+
+### Antes de ir para produção
+
+```ini
+ITSM_DEBUG=0
+ITSM_SECRET_KEY=<chave aleatória de 50 caracteres>
+ITSM_ALLOWED_HOSTS=itsm.suaempresa.com
+```
+
+O projeto **se recusa a iniciar** com `ITSM_DEBUG=0` e a chave de
+desenvolvimento — falhar na partida é melhor que rodar com sessões
+assináveis por qualquer pessoa que leia o código público.
+
+Troque também o SQLite por PostgreSQL, o backend de e-mail de console por SMTP
+real e rode `collectstatic`.
 
 ---
 
@@ -395,11 +412,8 @@ memória do `ldap3`.
 
 ## Licença
 
-Este repositório ainda **não tem licença definida**. Sem um arquivo `LICENSE`,
-o padrão legal é "todos os direitos reservados": o código fica visível, mas
-ninguém pode reutilizá-lo. Para permitir reuso, adicione uma licença —
-[MIT](https://choosealicense.com/licenses/mit/) é a escolha usual para
-projetos de portfólio.
+[MIT](LICENSE) — uso, cópia e modificação livres, mantendo o aviso de
+copyright.
 
 ---
 

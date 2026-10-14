@@ -25,6 +25,10 @@ curl http://localhost:8000/api/v1/eu/ \
 Os tokens são gerenciáveis em `/admin/authtoken/tokenproxy/` — dá para criar
 e revogar por ali.
 
+> O token mostrado acima é **um exemplo inventado**. Um token é uma credencial
+> equivalente à senha: não o publique, não o mande por mensagem e revogue-o no
+> `/admin/` assim que não precisar mais.
+
 ### Sessão (navegador)
 
 Estando logado no sistema, abra `http://localhost:8000/api/v1/` no browser:
