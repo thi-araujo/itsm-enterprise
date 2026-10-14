@@ -1,0 +1,13 @@
+{% comment %}
+Uma entrada da trilha de auditoria. Conteúdo interno da equipe — a view só
+manda os registros para quem tem can_manage_tickets.
+{% endcomment %}
+<div style="display:flex;gap:.7rem;padding:.5rem 0;border-bottom:1px solid rgba(28,37,64,.5);">
+  <i class="bi {{ log.icon }}" style="color:var(--itsm-accent);font-size:.9rem;flex-shrink:0;margin-top:.15rem;"></i>
+  <div style="flex:1;min-width:0;">
+    <div style="font-size:.82rem;line-height:1.5;">{{ log.summary }}</div>
+    <div style="font-size:.72rem;color:var(--itsm-muted);margin-top:.15rem;">
+      {{ log.author_display }} &bull; {{ log.created_at|date:"d/m/Y H:i" }}
+    </div>
+  </div>
+</div>

@@ -10,7 +10,8 @@ import os
 
 from apps.accounts.models import UserProfile
 from apps.accounts.permissions import management_required, staff_required
-from .models import Approval, Ticket, Comment, Category, Attachment, Escalation
+from .models import (Approval, AuditLog, Ticket, Comment, Category, Attachment,
+                     Escalation)
 from .forms import (TicketForm, TicketUpdateForm, CommentForm,
                     TicketFinishForm, EscalationForm, ApprovalForm)
 
@@ -104,12 +105,16 @@ def ticket_detail(request, pk):
     # O histórico de escalonamento é informação interna da equipe, e segue a
     # mesma regra das notas internas: fica fora do queryset do solicitante,
     # não escondido no template.
+    # A trilha de auditoria segue a mesma regra: "Prioridade: Crítica →
+    # Baixa" é conversa interna da equipe.
     if perfil.can_manage_tickets:
         escalations = ticket.escalations.select_related('from_user', 'to_user')
+        audit_logs  = ticket.audit_logs.select_related('user')
         finish_form = TicketFinishForm(instance=ticket)
         escalate_form = EscalationForm(user=request.user)
     else:
         escalations = ticket.escalations.none()
+        audit_logs  = ticket.audit_logs.none()
         finish_form = None
         escalate_form = None
 
@@ -128,6 +133,7 @@ def ticket_detail(request, pk):
         'comments':      comments,
         'attachments':   attachments,
         'escalations':   escalations,
+        'audit_logs':    audit_logs,
         'perfil':        perfil,
         **_politica_de_upload(),
     }
@@ -148,7 +154,9 @@ def ticket_create(request):
             precisa_aprovacao = bool(ticket.category and ticket.category.requires_approval)
             if precisa_aprovacao:
                 ticket.status = 'pending_approval'
-            ticket.save()
+            # save_as informa o autor para a auditoria (Fase 3.4); o evento
+            # 'created' é gravado pelo próprio save() do model.
+            ticket.save_as(request.user)
 
             try:
                 from apps.notifications.email import (notify_approval_requested,
@@ -183,6 +191,8 @@ def ticket_create(request):
                         filename=arquivo.name,
                         file_size=arquivo.size,
                     )
+                    AuditLog.registrar(ticket, request.user,
+                                       AuditLog.ACTION_ATTACHED, arquivo.name)
                 else:
                     messages.error(request, f'O anexo NÃO foi salvo. {erro}')
 
@@ -207,7 +217,10 @@ def ticket_update_status(request, pk):
     if request.method == 'POST':
         form = TicketUpdateForm(request.POST, instance=ticket)
         if form.is_valid():
-            updated = form.save()
+            # commit=False + save_as: o form prepara, o model audita sabendo
+            # quem alterou. Um form.save() direto gravaria sem autor.
+            updated = form.save(commit=False)
+            updated.save_as(request.user)
             try:
                 from apps.notifications.email import notify_ticket_assigned, notify_ticket_resolved
                 if updated.assignee:
@@ -250,7 +263,7 @@ def ticket_finish(request, pk):
     ticket.resolved_by = request.user
     # resolved_at é preenchido pelo save() do model quando o status vira
     # 'resolved' — não repetir aqui.
-    ticket.save()
+    ticket.save_as(request.user)
 
     # A solução também entra no histórico como comentário público, para o
     # solicitante ler na mesma linha do tempo dos outros comentários.
@@ -300,7 +313,14 @@ def ticket_escalate(request, pk):
     # Um chamado escalonado está em atendimento, não mais só "aberto".
     if ticket.status == 'open':
         ticket.status = 'in_progress'
-    ticket.save()
+    ticket.save_as(request.user)
+
+    # A troca de responsável e de status já é auditada pelo save(); esta
+    # entrada registra o evento em si, com o destino.
+    destino_log = (escalation.to_user.get_full_name()
+                   or escalation.to_user.username)
+    AuditLog.registrar(ticket, request.user, AuditLog.ACTION_ESCALATED,
+                       f'para {destino_log}')
 
     try:
         from apps.notifications.email import notify_ticket_escalated
@@ -374,7 +394,12 @@ def _decidir_aprovacao(request, pk, decision):
     else:
         ticket.status = 'rejected'
         aviso = f'Chamado #{ticket.pk:04d} rejeitado. O solicitante foi avisado.'
-    ticket.save()
+    ticket.save_as(request.user)
+
+    AuditLog.registrar(
+        ticket, request.user,
+        AuditLog.ACTION_APPROVED if approval.is_approved else AuditLog.ACTION_REJECTED,
+        approval.comment[:200])
 
     # O parecer também entra na linha do tempo, como comentário público: é
     # informação que o solicitante pode ver.
@@ -430,6 +455,9 @@ def add_comment(request, pk):
             if not request.user.profile.can_see_internal_notes:
                 comment.is_internal = False
             comment.save()
+            AuditLog.registrar(
+                ticket, request.user, AuditLog.ACTION_COMMENTED,
+                'nota interna' if comment.is_internal else '')
             try:
                 from apps.notifications.email import notify_comment_added
                 notify_comment_added(comment)
@@ -466,6 +494,8 @@ def upload_attachment(request, pk):
                 filename=arquivo.name,
                 file_size=arquivo.size,
             )
+            AuditLog.registrar(ticket, request.user,
+                               AuditLog.ACTION_ATTACHED, arquivo.name)
             if request.htmx:
                 return render(request, 'partials/attachment_item.html', {'att': att})
             messages.success(request, f'"{arquivo.name}" enviado com sucesso!')
@@ -518,7 +548,7 @@ def assign_ticket(request, pk):
                 ticket.assignee = tech
                 if ticket.status == 'open':
                     ticket.status = 'in_progress'
-                ticket.save()
+                ticket.save_as(request.user)
                 messages.success(request, f'Atribuído a {tech.get_full_name() or tech.username}!')
             except User.DoesNotExist:
                 messages.error(request, 'Técnico não encontrado.')

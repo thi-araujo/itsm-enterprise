@@ -175,9 +175,55 @@ nascendo `open` com SLA na abertura.
   `UserProfile.department` existe mas está preenchido só para `tecnico1` e
   `gerente1`.
 
-### 3.4 a 3.8
+### ✅ 3.4 — Auditoria — Concluída
+- [x] Model `AuditLog` (ticket, user, action, field, old_value, new_value,
+      description) com índice em `(ticket, -created_at)`
+- [x] **Captura automática**: o `Ticket` guarda um retrato dos campos auditados
+      no `from_db` e o `save()` compara. Alteração feita pela view, pelo
+      `/admin/`, pelo `manage.py shell` ou pelo `check_sla` — todas registradas,
+      sem depender de alguém lembrar de chamar o log
+- [x] Campos acompanhados (`Ticket.AUDITED_FIELDS`): status, prioridade,
+      técnico, categoria, prazo SLA, título e solução
+- [x] `old_value`/`new_value` guardam **texto já formatado** ("Crítica",
+      "Técnico Um"), não o código nem o id: se o usuário for renomeado ou
+      apagado, a entrada continua dizendo o que estava escrito na época
+- [x] `Ticket.save_as(user)` informa o autor; sem autor a tela mostra
+      **"Sistema"** — correto para o `check_sla`
+- [x] `TicketAdmin.save_model` preenche o autor nas alterações feitas pelo
+      `/admin/` (verificado: a edição pelo admin aparece com o nome do usuário)
+- [x] Eventos que não são mudança de campo registrados pelas views:
+      `created`, `commented` (marcando nota interna), `attached` (com o nome do
+      arquivo), `escalated`, `approved`, `rejected`
+- [x] Cartão "Histórico de alterações" na página do chamado, **só para a
+      equipe** e filtrado no queryset — "Prioridade: Crítica → Baixa" é
+      conversa interna
+- [x] `AuditLogAdmin` somente leitura (`has_add/change/delete_permission` →
+      `False`): log de auditoria editável não é log de auditoria
+- [x] 27 testes novos — suíte total: **160 testes**
+
+**Migração:** `tickets.0006_auditlog`.
+
+**Limitação conhecida e testada:** `QuerySet.update()` vai direto ao SQL e não
+passa pelo `save()`, então não é auditado. Hoje o projeto só usa `update()` em
+`sla_breach_notified`, que não está em `AUDITED_FIELDS`. Há um teste que fixa
+esse comportamento (`test_update_do_queryset_nao_e_auditado`).
+
+**Decisão:** `Escalation` e `Approval` continuam existindo. Eu havia sugerido
+que o `AuditLog` os "unificaria" — estava errado: aqueles guardam dados
+estruturados que o sistema consulta (motivo, decisão, parecer) e que a Fase 3.7
+vai usar. O `AuditLog` é a trilha cronológica e **recebe** entradas deles.
+Auditar os ativos do CMDB exigiria `ContentType`/`GenericForeignKey`; fica
+registrado como caminho futuro, fora do escopo do ROADMAP ("log de todas as
+ações **no chamado**").
+
+**Linha do tempo verificada no banco real** (transação revertida): abertura →
+aprovação (3 entradas: `approved`, Status, Prazo SLA) → técnico assume (Status,
+Prioridade, Técnico) → nota interna → escalonamento (`escalated` + Técnico) →
+finalização (Status, Solução). 12 entradas, nenhuma sem autor; `Paulo` não vê o
+cartão nem o texto no HTML; salvar sem alterar nada não gera entrada.
+
+### 3.5 a 3.8
 - [ ] API REST (DRF)
-- [ ] Auditoria
 - [ ] Dashboard avançado
 - [ ] Automações (escalonamento por SLA)
 - [ ] Integração AD/LDAP

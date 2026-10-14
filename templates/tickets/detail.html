@@ -335,6 +335,22 @@
       {% endfor %}
     </div>
     {% endif %}
+
+    <!-- Trilha de auditoria — interna, filtrada na view -->
+    {% if audit_logs %}
+    <div class="itsm-card mb-3" id="audit-card" style="padding:1.25rem;">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:.5rem;">
+        <i class="bi bi-clock-history me-2" style="color:var(--itsm-accent);"></i>
+        Histórico de alterações
+        <span style="color:var(--itsm-muted);font-weight:400;">({{ audit_logs.count }})</span>
+      </div>
+      <div style="max-height:420px;overflow-y:auto;">
+        {% for log in audit_logs %}
+          {% include 'partials/audit_item.html' with log=log %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <!-- Informações -->

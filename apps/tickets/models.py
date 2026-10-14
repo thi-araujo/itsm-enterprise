@@ -64,6 +64,18 @@ class Ticket(models.Model):
 
     # Status em que o chamado não está mais em atendimento.
     CLOSED_STATUSES = ('resolved', 'closed', 'rejected')
+
+    # Campos acompanhados pela auditoria (Fase 3.4), com o rótulo que aparece
+    # na linha do tempo. Qualquer save() que mude um deles gera uma entrada.
+    AUDITED_FIELDS = {
+        'status':       'Status',
+        'priority':     'Prioridade',
+        'assignee':     'Técnico Responsável',
+        'category':     'Categoria',
+        'sla_deadline': 'Prazo SLA',
+        'title':        'Título',
+        'solution':     'Solução',
+    }
     TYPE_CHOICES = [
         ('incident',       'Incidente'),
         ('request',        'Requisição'),
@@ -204,7 +216,107 @@ class Ticket(models.Model):
         self.sla_deadline = timezone.now() + timezone.timedelta(
             hours=self.sla_hours_for_priority())
 
+    # ──────────────────────────────────────────────────────────────
+    # Auditoria (Fase 3.4)
+    #
+    # O chamado guarda um retrato de como estava quando saiu do banco
+    # (`from_db`) e, a cada save(), compara o estado atual com esse retrato.
+    # Assim toda alteração fica registrada — pela view, pelo /admin/, pelo
+    # shell ou pelo comando check_sla —, sem depender de alguém lembrar de
+    # chamar o log em cada lugar.
+    #
+    # Limitação conhecida: `QuerySet.update()` vai direto ao SQL e não passa
+    # pelo save(), então não é auditado. Hoje o projeto só usa update() em
+    # `sla_breach_notified`, que não está em AUDITED_FIELDS.
+    # ──────────────────────────────────────────────────────────────
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._audit_snapshot = instance._audit_state()
+        return instance
+
+    def _audit_state(self):
+        """Valores brutos dos campos auditados, para comparar sem consultas.
+
+        Para as chaves estrangeiras guarda o id (`assignee_id`), e não o
+        objeto: ler `self.assignee` dispararia uma consulta a cada chamado
+        carregado, inclusive nas listagens, onde nada vai ser salvo.
+        """
+        estado = {}
+        for campo in self.AUDITED_FIELDS:
+            try:
+                atributo = self._meta.get_field(campo).attname   # 'assignee_id'
+            except Exception:
+                atributo = campo
+            estado[campo] = getattr(self, atributo, None)
+        return estado
+
+    def _audit_display(self, campo, valor_bruto):
+        """Converte o valor bruto no texto que vai para o log.
+
+        O log guarda o texto já formatado ("Crítica", "Técnico Um") e não o
+        código nem o id. Num registro de auditoria é isso que se quer: se o
+        usuário for renomeado ou apagado, a entrada continua dizendo o que
+        estava escrito na época — um FK vivo reescreveria o passado.
+        """
+        if valor_bruto in (None, ''):
+            return ''
+        if campo in ('status', 'priority'):
+            opcoes = dict(self.STATUS_CHOICES if campo == 'status' else self.PRIORITY_CHOICES)
+            return opcoes.get(valor_bruto, str(valor_bruto))
+        if campo == 'assignee':
+            user = User.objects.filter(pk=valor_bruto).first()
+            return (user.get_full_name() or user.username) if user else ''
+        if campo == 'category':
+            categoria = Category.objects.filter(pk=valor_bruto).first()
+            return categoria.name if categoria else ''
+        if campo == 'sla_deadline':
+            return timezone.localtime(valor_bruto).strftime('%d/%m/%Y %H:%M')
+        # Título e solução: texto livre, truncado para caber na coluna.
+        texto = str(valor_bruto)
+        return texto[:250] + '…' if len(texto) > 250 else texto
+
+    def save_as(self, user, *args, **kwargs):
+        """Salva registrando quem fez a alteração.
+
+        O save() não tem acesso ao request, então a view informa o autor. Sem
+        isso o log fica com o usuário nulo e a tela mostra "Sistema" — o que
+        é correto para o comando check_sla, mas não para uma ação de tela.
+        """
+        self._audit_user = user
+        return self.save(*args, **kwargs)
+
+    def _registrar_auditoria(self, criado):
+        from_user = getattr(self, '_audit_user', None)
+
+        if criado:
+            AuditLog.objects.create(ticket=self, user=from_user,
+                                    action=AuditLog.ACTION_CREATED)
+        else:
+            anterior = getattr(self, '_audit_snapshot', None)
+            if anterior is None:
+                # Instância montada na memória (sem vir do banco): não há com
+                # o que comparar, então não há o que registrar.
+                return
+            atual = self._audit_state()
+            for campo, rotulo in self.AUDITED_FIELDS.items():
+                if anterior.get(campo) == atual.get(campo):
+                    continue
+                AuditLog.objects.create(
+                    ticket=self, user=from_user, action=AuditLog.ACTION_UPDATED,
+                    field=rotulo,
+                    old_value=self._audit_display(campo, anterior.get(campo)),
+                    new_value=self._audit_display(campo, atual.get(campo)),
+                )
+
+        # Novo ponto de partida: um segundo save() na mesma requisição não
+        # pode registrar de novo a mesma alteração.
+        self._audit_snapshot = self._audit_state()
+
     def save(self, *args, **kwargs):
+        criado = self.pk is None
+
         # SLA automático ao criar — exceto aguardando aprovação, onde o
         # relógio só começa quando o gerente liberar (ver start_sla).
         if not self.pk and not self.sla_deadline and not self.is_awaiting_approval:
@@ -216,6 +328,7 @@ class Ticket(models.Model):
         if self.status == 'closed' and not self.closed_at:
             self.closed_at = timezone.now()
         super().save(*args, **kwargs)
+        self._registrar_auditoria(criado)
 
 
 class Comment(models.Model):
@@ -261,6 +374,102 @@ class Escalation(models.Model):
     def __str__(self):
         destino = self.to_user.username if self.to_user else "—"
         return f"#{self.ticket_id} escalonado para {destino}"
+
+
+class AuditLog(models.Model):
+    """Trilha cronológica de tudo o que aconteceu no chamado (Fase 3.4).
+
+    Não substitui a Escalation nem a Approval: aqueles guardam dados
+    estruturados que o sistema consulta (o motivo, a decisão, o parecer).
+    Este é o registro em ordem de tempo — eles geram entradas aqui.
+
+    As alterações de campo chegam automaticamente pelo save() do Ticket; os
+    eventos que não são mudança de valor (comentário, anexo, escalonamento,
+    aprovação) são registrados pelas views com `AuditLog.registrar`.
+    """
+
+    ACTION_CREATED   = 'created'
+    ACTION_UPDATED   = 'updated'
+    ACTION_COMMENTED = 'commented'
+    ACTION_ATTACHED  = 'attached'
+    ACTION_ESCALATED = 'escalated'
+    ACTION_APPROVED  = 'approved'
+    ACTION_REJECTED  = 'rejected'
+
+    ACTION_CHOICES = [
+        (ACTION_CREATED,   'Abriu o chamado'),
+        (ACTION_UPDATED,   'Alterou um campo'),
+        (ACTION_COMMENTED, 'Comentou'),
+        (ACTION_ATTACHED,  'Anexou arquivo'),
+        (ACTION_ESCALATED, 'Escalonou'),
+        (ACTION_APPROVED,  'Aprovou'),
+        (ACTION_REJECTED,  'Rejeitou'),
+    ]
+
+    # Ícone de cada ação na linha do tempo.
+    ACTION_ICONS = {
+        ACTION_CREATED:   'bi-plus-circle',
+        ACTION_UPDATED:   'bi-pencil',
+        ACTION_COMMENTED: 'bi-chat-left-text',
+        ACTION_ATTACHED:  'bi-paperclip',
+        ACTION_ESCALATED: 'bi-arrow-up-right-circle',
+        ACTION_APPROVED:  'bi-patch-check',
+        ACTION_REJECTED:  'bi-x-octagon',
+    }
+
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE,
+                               related_name='audit_logs', verbose_name="Ticket")
+    # Nulo = ação do sistema (o comando check_sla, por exemplo) ou usuário
+    # apagado depois. SET_NULL para a trilha sobreviver ao desligamento.
+    user   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name='audit_logs', verbose_name="Autor")
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES,
+                              verbose_name="Ação")
+    # Preenchidos só em 'updated'. Guardam o texto já formatado — ver
+    # Ticket._audit_display.
+    field      = models.CharField(max_length=60, blank=True, verbose_name="Campo")
+    old_value  = models.CharField(max_length=255, blank=True, verbose_name="Valor anterior")
+    new_value  = models.CharField(max_length=255, blank=True, verbose_name="Valor novo")
+    # Texto livre dos eventos que não são mudança de campo.
+    description = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Data")
+
+    class Meta:
+        verbose_name = "Registro de auditoria"
+        verbose_name_plural = "Registros de auditoria"
+        ordering = ['-created_at', '-id']
+        indexes = [models.Index(fields=['ticket', '-created_at'])]
+
+    def __str__(self):
+        return f"#{self.ticket_id} — {self.get_action_display()}"
+
+    @classmethod
+    def registrar(cls, ticket, user, action, description=''):
+        """Atalho para os eventos que não são alteração de campo."""
+        return cls.objects.create(ticket=ticket, user=user, action=action,
+                                  description=description)
+
+    @property
+    def author_display(self):
+        """Nome de quem agiu, ou "Sistema" quando não houve usuário."""
+        if not self.user:
+            return 'Sistema'
+        return self.user.get_full_name() or self.user.username
+
+    @property
+    def icon(self):
+        return self.ACTION_ICONS.get(self.action, 'bi-circle')
+
+    @property
+    def summary(self):
+        """Uma frase pronta para a linha do tempo."""
+        if self.action == self.ACTION_UPDATED:
+            de  = self.old_value or '—'
+            para = self.new_value or '—'
+            return f"{self.field}: {de} → {para}"
+        if self.description:
+            return f"{self.get_action_display()} — {self.description}"
+        return self.get_action_display()
 
 
 class Approval(models.Model):
