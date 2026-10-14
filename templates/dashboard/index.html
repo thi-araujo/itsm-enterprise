@@ -1,55 +1,148 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Dashboard — ITSM Enterprise{% endblock %}
 {% block breadcrumb %}<i class="bi bi-grid-1x2 me-2"></i> Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-  <h4 style="font-weight:700;margin-bottom:.25rem;">Painel de Controle</h4>
-  <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">Visão geral do suporte em tempo real</p>
+{% comment %}
+A URL da API chega por data-attribute: assim o JS pode viver num arquivo .js
+externo, sem precisar da tag de URL do Django (ver static/js/dashboard.js).
+{% endcomment %}
+<div id="dashboard-data"
+     data-stats-url="{% url 'api:estatisticas' %}"
+     data-pode-gerenciar="{{ perfil.can_manage_tickets|yesno:'1,0' }}"
+     hidden></div>
+
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-4">
+  <div>
+    <h4 style="font-weight:700;margin-bottom:.25rem;">Painel de Controle</h4>
+    <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">
+      Visão geral do suporte
+      <span id="dash-atualizado" style="font-size:.78rem;"></span>
+    </p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <label class="form-label mb-0" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+      Período
+    </label>
+    <select id="dash-periodo" class="form-select form-select-sm" style="width:auto;">
+      <option value="">Tudo</option>
+      <option value="7">7 dias</option>
+      <option value="30">30 dias</option>
+      <option value="90">90 dias</option>
+    </select>
+  </div>
 </div>
 
 <!-- Stats -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--itsm-accent);">{{ stats.total }}</div>
+      <div class="stat-value" style="color:var(--itsm-accent);" data-stat="total">{{ stats.total }}</div>
       <div class="stat-label">Total</div>
       <i class="bi bi-collection stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:#60a5fa;">{{ stats.open }}</div>
+      <div class="stat-value" style="color:#60a5fa;" data-stat="open">{{ stats.open }}</div>
       <div class="stat-label">Abertos</div>
       <i class="bi bi-circle stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:#38bdf8;">{{ stats.in_progress }}</div>
+      <div class="stat-value" style="color:#38bdf8;" data-stat="in_progress">{{ stats.in_progress }}</div>
       <div class="stat-label">Em Andamento</div>
       <i class="bi bi-arrow-repeat stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--itsm-success);">{{ stats.resolved }}</div>
+      <div class="stat-value" style="color:var(--itsm-success);" data-stat="resolved">{{ stats.resolved }}</div>
       <div class="stat-label">Resolvidos</div>
       <i class="bi bi-check-circle stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:#a78bfa;">{{ stats.critical }}</div>
+      <div class="stat-value" style="color:#a78bfa;" data-stat="critical">{{ stats.critical }}</div>
       <div class="stat-label">Críticos</div>
       <i class="bi bi-exclamation-octagon stat-icon"></i>
     </div>
   </div>
   <div class="col-6 col-lg-2">
     <div class="stat-card">
-      <div class="stat-value" style="color:var(--itsm-danger);">{{ stats.sla_risk }}</div>
+      <div class="stat-value" style="color:var(--itsm-danger);" data-stat="sla_risk">{{ stats.sla_risk }}</div>
       <div class="stat-label">SLA Vencido</div>
       <i class="bi bi-alarm stat-icon"></i>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+KPIs e gráficos de gestão: o solicitante não vê "cumprimento de SLA" nem a
+distribuição por técnico — são números da equipe.
+{% endcomment %}
+{% if perfil.can_manage_tickets %}
+<div class="row g-3 mb-4" id="dash-kpis">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--itsm-success);font-size:1.5rem;" data-stat="sla_percentual">
+        {% if stats.sla_percentual is not None %}{{ stats.sla_percentual }}%{% else %}—{% endif %}
+      </div>
+      <div class="stat-label">SLA cumprido</div>
+      <i class="bi bi-patch-check stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--itsm-info);font-size:1.5rem;" data-stat="tempo_medio">
+        {% if stats.tempo_medio is not None %}{{ stats.tempo_medio }}h{% else %}—{% endif %}
+      </div>
+      <div class="stat-label">Tempo médio de resolução</div>
+      <i class="bi bi-clock-history stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--itsm-warning);font-size:1.5rem;" data-stat="sla_em_risco">
+        {{ stats.sla_em_risco }}
+      </div>
+      <div class="stat-label">SLA em risco</div>
+      <i class="bi bi-alarm stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--itsm-muted);font-size:1.5rem;" data-stat="sem_tecnico">
+        {{ stats.sem_tecnico }}
+      </div>
+      <div class="stat-label">Sem técnico</div>
+      <i class="bi bi-person-x stat-icon"></i>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Gráficos -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <div class="itsm-card" style="padding:1.25rem;">
+      <div class="section-title">Por status</div>
+      <div style="height:220px;"><canvas id="grafico-status"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="itsm-card" style="padding:1.25rem;">
+      <div class="section-title">Por prioridade</div>
+      <div style="height:220px;"><canvas id="grafico-prioridade"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="itsm-card" style="padding:1.25rem;">
+      <div class="section-title">Chamados por dia</div>
+      <div style="height:220px;"><canvas id="grafico-volume"></canvas></div>
     </div>
   </div>
 </div>
@@ -117,4 +210,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/dashboard.js' %}"></script>
 {% endblock %}

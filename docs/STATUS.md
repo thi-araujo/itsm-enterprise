@@ -65,9 +65,12 @@ O rename de classes tinha sido feito só no CSS: os templates escreviam `itsm-ca
   `.itsm-card-header`, `.comment-box`, `.att-item`, `.info-row`, `.empty-state`,
   `.section-title`, `.dot-*`, `.sla-ok`, `.sla-warn`, `.btn-outline-itsm` seguem
   definidos e sem uso. Trocar o inline por essas classes é o próximo passo do CSS.
-- `report_dashboard` roda uma query por dia no gráfico de volume diário (até 30 queries).
-- O JS de badges segue inline no `base.html` porque usa `{% url %}` — não dá para mover
-  para um arquivo .js sem passar as URLs por outro caminho.
+- ~~`report_dashboard` roda uma query por dia no gráfico de volume diário~~
+  **resolvido na Fase 3.6** (`TruncDate` em `apps/tickets/stats.py`, travado por
+  `assertNumQueries(1)`).
+- O JS de badges segue inline no `base.html` porque usa `{% url %}`. A Fase 3.6
+  mostrou o caminho: passar a URL por `data-attribute` (foi o que o
+  `static/js/dashboard.js` fez). Falta aplicar no `base.html`.
 
 ### ✅ 3.1 — RBAC — Concluída
 - [x] Model `UserProfile` com perfil: solicitante, tecnico, gerente, admin
@@ -325,6 +328,48 @@ token obtido por usuário+senha; abertura (201); solução "ok" recusada com
 com o autor correto em todas as cinco entradas. O chamado de teste foi
 removido do banco.
 
-### 3.6 e 3.8 — pendentes
-- [ ] 3.6 Dashboard avançado (vai consumir `/api/v1/estatisticas/`)
-- [ ] 3.8 Integração AD/LDAP
+### ✅ 3.6 — Dashboard avançado — Concluída
+- [x] `apps/tickets/stats.py` — uma fonte para as agregações, usada pela API,
+      pelo dashboard e pelos relatórios. Antes a conta estava duplicada entre a
+      API e os relatórios; com o dashboard entrando, viraria uma terceira cópia
+- [x] **Pendência nº 3 resolvida**: o volume diário fazia um `count()` por dia
+      (até 30 consultas para um gráfico). Agora é **uma** consulta com
+      `TruncDate`, e o teste usa `assertNumQueries(1)` — se o laço voltar, falha
+- [x] Os dias sem chamado são preenchidos com zero em Python: o banco não
+      devolve linha para dia vazio e o gráfico ficaria com buracos
+- [x] **Pendência nº 4 encaminhada**: o JS do dashboard vive em
+      `static/js/dashboard.js`, com a URL da API chegando por
+      `data-stats-url` — era o que faltava para tirar o JS do template
+- [x] `/api/v1/estatisticas/` ganhou `volume_diario`, `por_tipo`,
+      `sla_cumprimento`, `tempo_medio_resolucao_horas`, `sla_em_risco`,
+      `resolvidos` e `periodo_dias`
+- [x] Chaves limpas no JSON (`{nome, total}`), e não o `category__name` cru do
+      ORM — é contrato público. Template dos relatórios ajustado
+- [x] **A view continua calculando a primeira carga**: se o `fetch` falhar, a
+      página mostra números corretos em vez de zeros, e o aviso vira
+      "falha ao atualizar (dados da última carga)"
+- [x] Seletor de período (Tudo / 7 / 30 / 90 dias) sem recarregar a página, e
+      atualização automática a cada 60s com "atualizado às HH:MM"
+- [x] Três gráficos Chart.js: rosca por status, barras por prioridade, linha do
+      volume diário. Atualizados com `.update()` em vez de recriados, para não
+      piscar nem vazar instâncias
+- [x] Dois KPIs novos para a equipe: **cumprimento de SLA** e **tempo médio de
+      resolução**; mais "SLA em risco" e "sem técnico"
+- [x] O solicitante **não** vê os KPIs de gestão nem recebe `por_tecnico` /
+      `sla_cumprimento` / `sem_tecnico` no JSON — são números da equipe
+- [x] `report_dashboard` aceita `?days=abc` sem quebrar (antes estourava
+      `ValueError`) e usa `CLOSED_STATUSES` no contador de atrasados
+- [x] 32 testes novos — suíte total: **293 testes**
+
+**Detalhe de implementação:** `stats.STATUS_RESOLVIDOS` é `('resolved',
+'closed')`, de propósito diferente de `Ticket.CLOSED_STATUSES`, que inclui
+`rejected`. Um chamado rejeitado foi encerrado, mas **não** foi resolvido — e
+contá-lo distorceria o cumprimento de SLA. Há teste para isso.
+
+**Verificado no navegador** (servidor rodando): `dashboard.js` servido (HTTP
+200); endpoint devolvendo os 7 campos novos; `tecnico1` e `gerente1` com os
+KPIs e os 3 gráficos; `Paulo` sem os KPIs, com `data-pode-gerenciar="0"` e
+total 1 contra 13 da equipe.
+
+### 3.8 — pendente
+- [ ] Integração AD/LDAP

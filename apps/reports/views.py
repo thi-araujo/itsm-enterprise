@@ -8,94 +8,51 @@ import json
 
 from apps.accounts.models import UserProfile
 from apps.accounts.permissions import management_required
+from apps.tickets import stats
 from apps.tickets.models import Ticket
 
 
 @login_required
 @management_required
 def report_dashboard(request):
-    days  = int(request.GET.get('days', 30))
-    since = timezone.now() - timedelta(days=days)
+    """Relatório geral. As agregações vêm de apps/tickets/stats.py, as mesmas
+    que o dashboard e a API usam."""
+    try:
+        days = max(1, int(request.GET.get('days', 30)))
+    except (TypeError, ValueError):
+        days = 30
+
+    since   = timezone.now() - timedelta(days=days)
     tickets = Ticket.objects.filter(created_at__gte=since)
 
-    # Por status
-    by_status = {
-        item['status']: item['count']
-        for item in tickets.values('status').annotate(count=Count('id'))
-    }
+    dados = stats.estatisticas_de(tickets)
+    sla   = dados['sla_cumprimento']
 
-    # Por prioridade
-    by_priority = {
-        item['priority']: item['count']
-        for item in tickets.values('priority').annotate(count=Count('id'))
-    }
-
-    # Por categoria (top 6)
-    by_category = list(
-        tickets.exclude(category__isnull=True)
-               .values('category__name')
-               .annotate(count=Count('id'))
-               .order_by('-count')[:6]
-    )
-
-    # Por tipo
-    by_type = {
-        item['ticket_type']: item['count']
-        for item in tickets.values('ticket_type').annotate(count=Count('id'))
-    }
-
-    # Por técnico (top 8)
-    by_tech = list(
-        tickets.exclude(assignee__isnull=True)
-               .values('assignee__username',
-                       'assignee__first_name',
-                       'assignee__last_name')
-               .annotate(count=Count('id'))
-               .order_by('-count')[:8]
-    )
-
-    # Volume diário (últimos N dias, máx 30)
-    daily = []
-    for i in range(min(days, 30)):
-        day   = timezone.now().date() - timedelta(days=i)
-        count = Ticket.objects.filter(created_at__date=day).count()
-        daily.append({'date': day.strftime('%d/%m'), 'count': count})
-    daily.reverse()
-
-    # KPIs
-    total    = tickets.count()
-    resolved = tickets.filter(status__in=['resolved', 'closed']).count()
-
-    # SLA compliance
-    resolved_qs = tickets.filter(
-        status__in=['resolved', 'closed'],
-        resolved_at__isnull=False,
-        sla_deadline__isnull=False,
-    )
-    # Comparação feita no banco (F) — antes iterava todos os tickets em memória.
-    sla_ok    = resolved_qs.filter(resolved_at__lte=F('sla_deadline')).count()
-    sla_total = resolved_qs.count()
-    sla_pct   = round((sla_ok / sla_total * 100) if sla_total else 0, 1)
-
-    breached_open = Ticket.objects.filter(
-        sla_deadline__lt=timezone.now(),
-        status__in=['open', 'in_progress', 'waiting'],
-    ).count()
+    # Chamados com prazo estourado e ainda em atendimento — sem recorte de
+    # período, porque um atraso antigo continua sendo um atraso hoje.
+    breached_open = (Ticket.objects
+                     .exclude(status__in=Ticket.CLOSED_STATUSES)
+                     .filter(sla_deadline__lt=timezone.now())
+                     .count())
 
     context = {
         'days':             days,
-        'total':            total,
-        'resolved':         resolved,
-        'sla_pct':          sla_pct,
+        'total':            dados['total'],
+        'resolved':         dados['resolvidos'],
+        'sla_pct':          sla['percentual'] or 0,
         'breached_open':    breached_open,
-        'by_status_json':   json.dumps(by_status),
-        'by_priority_json': json.dumps(by_priority),
-        'by_type_json':     json.dumps(by_type),
-        'by_category_json': json.dumps(by_category),
-        'by_tech_json':     json.dumps(by_tech),
-        'daily_json':       json.dumps(daily),
-        'by_category':      by_category,
-        'by_tech':          by_tech,
+        'tempo_medio':      dados['tempo_medio_resolucao_horas'],
+        'by_status_json':   json.dumps(dados['por_status']),
+        'by_priority_json': json.dumps(dados['por_prioridade']),
+        'by_type_json':     json.dumps(dados['por_tipo']),
+        'by_category_json': json.dumps(dados['por_categoria']),
+        'by_tech_json':     json.dumps(dados['por_tecnico']),
+        # A chave muda de 'dia'/'total' para 'date'/'count' porque é o que o
+        # template já espera no Chart.js.
+        'daily_json':       json.dumps([{'date': d['dia'], 'count': d['total']}
+                                        for d in stats.volume_diario(tickets, days)]),
+        'by_category':      dados['por_categoria'],
+        'by_tech':          dados['por_tecnico'],
     }
     return render(request, 'reports/dashboard.html', context)
 

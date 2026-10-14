@@ -112,17 +112,17 @@
       {% for tech in by_tech %}
       <tr>
         <td style="font-weight:500;">
-          {{ tech.assignee__first_name }} {{ tech.assignee__last_name|default:tech.assignee__username }}
+          {{ tech.nome }}
         </td>
-        <td class="ticket-id">{{ tech.count }}</td>
+        <td class="ticket-id">{{ tech.total }}</td>
         <td style="min-width:160px;">
           {% if total > 0 %}
           <div style="display:flex;align-items:center;gap:.5rem;">
             <div style="flex:1;background:var(--itsm-border);border-radius:3px;height:6px;">
-              <div style="width:{% widthratio tech.count total 100 %}%;background:var(--itsm-accent);height:6px;border-radius:3px;"></div>
+              <div style="width:{% widthratio tech.total total 100 %}%;background:var(--itsm-accent);height:6px;border-radius:3px;"></div>
             </div>
             <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--itsm-muted);">
-              {% widthratio tech.count total 100 %}%
+              {% widthratio tech.total total 100 %}%
             </span>
           </div>
           {% endif %}
@@ -149,16 +149,16 @@
       <tbody>
       {% for cat in by_category %}
       <tr>
-        <td style="font-weight:500;">{{ cat.category__name }}</td>
-        <td class="ticket-id">{{ cat.count }}</td>
+        <td style="font-weight:500;">{{ cat.nome }}</td>
+        <td class="ticket-id">{{ cat.total }}</td>
         <td style="min-width:160px;">
           {% if total > 0 %}
           <div style="display:flex;align-items:center;gap:.5rem;">
             <div style="flex:1;background:var(--itsm-border);border-radius:3px;height:6px;">
-              <div style="width:{% widthratio cat.count total 100 %}%;background:var(--itsm-success);height:6px;border-radius:3px;"></div>
+              <div style="width:{% widthratio cat.total total 100 %}%;background:var(--itsm-success);height:6px;border-radius:3px;"></div>
             </div>
             <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--itsm-muted);">
-              {% widthratio cat.count total 100 %}%
+              {% widthratio cat.total total 100 %}%
             </span>
           </div>
           {% endif %}
@@ -230,9 +230,9 @@ new Chart(document.getElementById('chartPriority'), {
 new Chart(document.getElementById('chartCategory'), {
   type: 'bar',
   data: {
-    labels: byCat.map(c => c.category__name || 'Sem categoria'),
+    labels: byCat.map(c => c.nome || 'Sem categoria'),
     datasets: [{
-      label: 'Tickets', data: byCat.map(c => c.count),
+      label: 'Tickets', data: byCat.map(c => c.total),
       backgroundColor: 'rgba(79,142,247,.7)',
       borderColor: '#4f8ef7', borderWidth: 1, borderRadius: 4,
     }]

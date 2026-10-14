@@ -86,7 +86,7 @@ para ver o que a tela esconde.
 | Método | Rota | Quem | O quê |
 |---|---|---|---|
 | `GET` | `/eu/` | autenticado | identidade, papel e **permissões** |
-| `GET` | `/estatisticas/` | autenticado | números agregados (`?days=N`) |
+| `GET` | `/estatisticas/` | autenticado | números agregados (`?days=N`) — ver abaixo |
 | `GET` | `/categorias/` | autenticado | somente leitura; mostra `requires_approval` |
 | `GET` | `/ativos/` | equipe | CMDB (`?search=`) |
 | `GET` | `/tecnicos/` | equipe | quem pode receber chamados |
@@ -110,6 +110,44 @@ O `/eu/` existe para o cliente não adivinhar permissões:
   }
 }
 ```
+
+### `/estatisticas/`
+
+Alimenta o dashboard (Fase 3.6). As contas vivem em `apps/tickets/stats.py`,
+compartilhadas com o dashboard e os relatórios.
+
+```json
+{
+  "periodo_dias": 7,
+  "total": 13,
+  "resolvidos": 3,
+  "em_aberto": 10,
+  "sem_tecnico": 8,
+  "sla_vencido": 10,
+  "sla_em_risco": 0,
+  "aguardando_aprovacao": 0,
+  "por_status":     {"open": 8, "in_progress": 2, "resolved": 3},
+  "por_prioridade": {"low": 2, "medium": 8, "high": 2, "critical": 1},
+  "por_tipo":       {"incident": 10, "problem": 2, "request": 1},
+  "sla_cumprimento": {"no_prazo": 3, "atrasados": 0, "avaliados": 3, "percentual": 100.0},
+  "tempo_medio_resolucao_horas": 4.2,
+  "por_categoria": [{"nome": "Rede e Conectividade", "total": 4}],
+  "por_tecnico":   [{"username": "Thiago", "nome": "Thiago Analista", "total": 4}],
+  "volume_diario": [{"dia": "08/10", "total": 0}, {"dia": "09/10", "total": 2}]
+}
+```
+
+- `?days=N` recorta o período (sem o parâmetro, considera tudo). `N` inválido
+  ou menor que 1 → **400**.
+- `volume_diario` tem **um ponto por dia**, inclusive os dias sem chamado
+  (valor zero) — senão o gráfico ficaria com buracos. Máximo de 90 pontos.
+- `percentual` do `sla_cumprimento` é **`null`** quando não há nada resolvido
+  com prazo definido, e `tempo_medio_resolucao_horas` é `null` quando não há
+  nada resolvido. `null` e não zero: zero seria lido como "100% de atraso" ou
+  "resolvemos instantaneamente".
+- O **solicitante não recebe** `por_tecnico`, `sla_cumprimento` nem
+  `sem_tecnico` — são números de gestão. Os demais vêm filtrados pelos
+  chamados dele.
 
 ## Exemplos
 

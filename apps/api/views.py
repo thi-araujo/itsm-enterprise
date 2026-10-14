@@ -15,8 +15,6 @@ Duas ideias organizam este arquivo:
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Q
-from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -25,7 +23,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 
 from apps.accounts.models import UserProfile
 from apps.cmdb.models import Asset
-from apps.tickets import services
+from apps.tickets import services, stats
 from apps.tickets.models import Approval, Category, Ticket
 
 from .permissions import IsManagement, IsStaff, ReadOnlyOrStaff
@@ -311,44 +309,30 @@ def estatisticas(request):
     """Números agregados, já respeitando o perfil de acesso.
 
     O solicitante recebe os números dos próprios chamados; a equipe, de
-    todos. Serve ao dashboard (e é o que a Fase 3.6 vai consumir, em vez de
-    repetir essas contas no template).
+    todos. As contas vivem em `apps/tickets/stats.py`, compartilhadas com o
+    dashboard e com os relatórios.
 
-    Aceita `?days=N` para recortar por período.
+    Aceita `?days=N` para recortar o período (padrão: tudo).
     """
-    tickets = Ticket.objects.visible_to(request.user)
-
     dias = request.query_params.get('days')
     if dias:
         try:
-            desde = timezone.now() - timezone.timedelta(days=int(dias))
-            tickets = tickets.filter(created_at__gte=desde)
+            dias = int(dias)
+            if dias < 1:
+                raise ValueError
         except (TypeError, ValueError):
-            return Response({'days': ['Informe um número inteiro de dias.']},
+            return Response({'days': ['Informe um número inteiro de dias maior que zero.']},
                             status=status.HTTP_400_BAD_REQUEST)
+    else:
+        dias = None
 
-    agora = timezone.now()
-    por_status = {item['status']: item['count']
-                  for item in tickets.values('status').annotate(count=Count('id'))}
-    por_prioridade = {item['priority']: item['count']
-                      for item in tickets.values('priority').annotate(count=Count('id'))}
+    tickets = Ticket.objects.visible_to(request.user)
+    dados = stats.estatisticas_de(tickets, dias=dias)
 
-    abertos = tickets.exclude(status__in=Ticket.CLOSED_STATUSES)
+    # O solicitante não recebe os números de gestão: distribuição por técnico
+    # e cumprimento de SLA são informação da equipe.
+    if not request.user.profile.can_manage_tickets:
+        for chave in ('por_tecnico', 'sla_cumprimento', 'sem_tecnico'):
+            dados.pop(chave, None)
 
-    return Response({
-        'total':            tickets.count(),
-        'por_status':       por_status,
-        'por_prioridade':   por_prioridade,
-        'em_aberto':        abertos.count(),
-        'sem_tecnico':      abertos.filter(assignee__isnull=True).count(),
-        'sla_vencido':      abertos.filter(sla_deadline__lt=agora).count(),
-        'aguardando_aprovacao': tickets.filter(status='pending_approval').count(),
-        'por_categoria': list(
-            tickets.exclude(category__isnull=True)
-                   .values('category__name')
-                   .annotate(count=Count('id')).order_by('-count')[:6]),
-        'por_tecnico': list(
-            tickets.exclude(assignee__isnull=True)
-                   .values('assignee__username')
-                   .annotate(count=Count('id')).order_by('-count')[:10]),
-    })
+    return Response(dados)
