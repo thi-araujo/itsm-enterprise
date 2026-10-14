@@ -28,10 +28,19 @@ from apps.accounts.models import UserProfile
 class Command(BaseCommand):
     help = 'Testa a conexão e a autenticação no Active Directory.'
 
+    # Só em memória, durante a execução do comando: o --list reaproveita a
+    # credencial digitada no teste de bind, em vez de pedir duas vezes.
+    _senha = ''
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--user',
             help='Usuário do AD para testar o bind. A senha é pedida na hora.',
+        )
+        parser.add_argument(
+            '--list', action='store_true',
+            help='Lista as contas do diretório e o papel que cada uma '
+                 'receberia. Exige --user para autenticar a consulta.',
         )
 
     def handle(self, *args, **opcoes):
@@ -55,7 +64,11 @@ class Command(BaseCommand):
                 '  python manage.py ldap_check --user <usuario>')
             return
 
-        self._testar_autenticacao(username)
+        if not self._testar_autenticacao(username):
+            return
+
+        if opcoes.get('list'):
+            self._listar(username)
 
     # ──────────────────────────────────────────────────────────────
 
@@ -174,18 +187,20 @@ class Command(BaseCommand):
         senha = getpass(f'  Senha de {username} no domínio (não é exibida): ')
         if not senha:
             self._erro('senha vazia — o AD trataria isso como bind anônimo.')
-            return
+            return False
+        # Guardada só em memória, para o --list não pedir a senha duas vezes.
+        self._senha = senha
 
         try:
             dados = ldap_client.autenticar(username, senha)
         except ldap_client.LdapIndisponivel as erro:
             self._erro(f'servidor indisponível: {erro}')
-            return
+            return False
 
         if dados is None:
             self._erro('credencial recusada, ou a conta não está dentro de '
                        'LDAP_SEARCH_BASE. Veja o log acima para distinguir.')
-            return
+            return False
 
         self._ok('bind aceito pelo AD')
         self._titulo('Dados lidos do diretório')
@@ -227,3 +242,60 @@ class Command(BaseCommand):
             self.stdout.write('\n  Copie da lista de grupos acima os nomes '
                               'certos para o LDAP_GROUP_ROLE_MAP em '
                               'itsm_project/settings.py.')
+
+    # ──────────────────────────────────────────────────────────────
+
+    def _listar(self, username):
+        """Conferência em massa: o que o ITSM leria de cada conta do AD.
+
+        Mostra os dados que o login gravaria e o papel resultante, usando as
+        mesmas funções do backend — a listagem não tem uma segunda
+        implementação que poderia divergir.
+        """
+        self._titulo('Contas do diretório')
+        try:
+            contas = ldap_client.listar_usuarios(username, self._senha)
+        except ldap_client.LdapIndisponivel as erro:
+            self._erro(f'servidor indisponível: {erro}')
+            return
+
+        if contas is None:
+            self._erro('credencial recusada na consulta.')
+            return
+        if not contas:
+            self._aviso('nenhuma conta de pessoa encontrada em '
+                        f'{settings.LDAP_SEARCH_BASE}.')
+            return
+
+        papeis = dict(UserProfile.ROLE_CHOICES)
+        padrao = settings.LDAP_DEFAULT_ROLE
+        self.stdout.write(
+            f'  {"CONTA":<22}{"NOME":<26}{"E-MAIL":<30}'
+            f'{"DEPARTAMENTO":<18}PAPEL')
+        self.stdout.write('  ' + '-' * 112)
+
+        sem_email = sem_nome = 0
+        for conta in contas:
+            nome = f'{conta.first_name} {conta.last_name}'.strip()
+            papel = papel_para_grupos(conta.groups)
+            rotulo = papeis.get(papel or padrao, papel or padrao)
+            if papel is None:
+                # Marca quem entra pelo padrão, para a lista não dar a
+                # impressão de que o AD decidiu o papel dessa pessoa.
+                rotulo += ' (padrão)'
+            if not conta.email:
+                sem_email += 1
+            if not nome:
+                sem_nome += 1
+            self.stdout.write(
+                f'  {conta.username:<22}{nome or "—":<26}'
+                f'{conta.email or "—":<30}{conta.department or "—":<18}{rotulo}')
+
+        self.stdout.write(f'\n  {len(contas)} conta(s).')
+        if sem_email:
+            self._aviso(f'{sem_email} sem e-mail: não receberão as '
+                        'notificações por e-mail do ITSM.')
+        if sem_nome:
+            self._aviso(f'{sem_nome} sem nome legível: aparecerão pelo login.')
+        if not sem_email and not sem_nome:
+            self._ok('todas as contas têm nome e e-mail preenchidos.')

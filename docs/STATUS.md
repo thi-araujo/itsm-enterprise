@@ -419,7 +419,11 @@ total 1 contra 13 da equipe.
 - [x] `ldap_check --user` avisa quando a conta não tem `mail` no AD: o ITSM
       manda e-mail em abertura, comentário, resolução e vencimento de SLA, e
       sem endereço essas mensagens não têm para onde ir
-- [x] 55 testes novos — suíte total: **348 testes**
+- [x] `ldap_check --user <conta> --list` confere as contas do diretório em
+      massa: mostra o que o ITSM leria de cada uma e o papel resultante,
+      usando as mesmas funções do login. Exclui contas de computador, que no
+      AD também têm `objectClass=user`
+- [x] 63 testes novos — suíte total: **356 testes**
 
 **Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
 
@@ -429,9 +433,12 @@ total 1 contra 13 da equipe.
 `192.168.10.4`; o DC é `dc01.exemplo.local` pelo registro SRV; **LDAP na 389
 responde** e a base `DC=exemplo,DC=local` foi confirmada pelos naming contexts
 do servidor. **Bind real validado** com `joao.silva` na 389: 7 grupos
-lidos, papel resolvido como Administrador. O `LDAP_GROUP_ROLE_MAP` foi
-atualizado com os nomes reais (`GRP-Admins`, `Domain Admins`, `GRP-Technical`);
-`GRP-Managers` está no mapa mas **ainda não existe no AD**.
+lidos, papel resolvido como Administrador. **O `LDAP_GROUP_ROLE_MAP` tem só
+`Domain Admins`**: os grupos `GRP-*` do domínio são do File Server e são
+concedidos por GPO, então mapeá-los daria privilégio de atendimento a quem só
+recebeu acesso a um compartilhamento. O papel de Técnico/Gerente é dado à mão
+em /admin/, e o login seguinte não desfaz (sem grupo casando, o papel atual é
+mantido). `MapaDeGruposDoProjetoTests` falha se um `GRP-*` voltar ao mapa.
 
 > ⚠️ **O DC não tem certificado de servidor instalado.** A 636 abre a conexão
 > TCP e derruba o TLS (`WinError 10054`); o StartTLS na 389 responde

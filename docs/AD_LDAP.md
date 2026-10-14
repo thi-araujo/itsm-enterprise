@@ -131,41 +131,61 @@ Em `itsm_project/settings.py`:
 
 ```python
 LDAP_GROUP_ROLE_MAP = [
-    ('GRP-Admins',     'admin'),
-    ('Domain Admins',  'admin'),
-    ('GRP-Managers',   'manager'),     # ainda não existe no AD — criar
-    ('GRP-Technical',  'technician'),
+    ('Domain Admins', 'admin'),
 ]
 LDAP_DEFAULT_ROLE = 'requester'
 ```
 
-Estes são os nomes **reais** do domínio `exemplo.local`, conferidos em
-14/10/2026. Os outros grupos que existem lá (`GRP-Geral`, `GRP-Arquivos`,
-`GRP-Documentos`, `GRP-Cofre`) ficaram de fora de propósito: não são papéis de
-atendimento. Grupo não listado simplesmente não concede privilégio — quem está
-só neles entra como Solicitante.
+**Só um grupo, e isso é deliberado.** Os grupos `GRP-*` do domínio
+`exemplo.local` (`GRP-Geral`, `GRP-Arquivos`, `GRP-Documentos`, `GRP-Cofre`,
+`GRP-Technical`, `GRP-Admins`) são do **File Server** e são concedidos por
+**GPO, automaticamente**. Ligar `GRP-Technical` ao papel de Técnico daria
+privilégio de atendimento a quem só recebeu acesso a um compartilhamento —
+escalonamento de privilégio pela GPO, sem ninguém ter decidido isso. Há um
+teste (`MapaDeGruposDoProjetoTests`) que falha se algum deles voltar ao mapa.
 
-**`GRP-Managers` ainda não existe no AD.** A entrada está no mapa para o dia em
-que o grupo for criado; até lá ninguém recebe o papel de Gerente pelo AD (dá
-para definir pelo `/admin/`, que o próximo login não sobrescreve, porque sem
-grupo casando o papel atual é mantido).
+Então o fluxo é:
 
-**`Domain Admins` → `admin` merece decisão sua.** É conveniente e foi o que
-resolveu o papel na primeira prova, mas acopla a administração do ITSM à
-administração do domínio: quem for adicionado a `Domain Admins` por um motivo
-de infraestrutura ganha o ITSM inteiro de brinde. Se preferir desacoplar,
-remova a linha e use só `GRP-Admins`.
+1. A pessoa entra pela primeira vez e é criada como **Solicitante**.
+2. Você promove a Técnico ou Gerente em **/admin/ → Perfis de Acesso**.
+3. **O login seguinte não desfaz isso**: sem grupo casando, o papel atual é
+   mantido. Esta é a regra que faz o ajuste manual ser durável.
 
-É uma **lista ordenada**, não um dicionário: o primeiro grupo que casar vence,
-então o papel mais privilegiado vem primeiro. Quem está em `ITSM-Admins` e em
-`ITSM-Tecnicos` ao mesmo tempo precisa sair como Administrador, e não depender
-da ordem em que o AD devolveu os grupos. A comparação ignora maiúsculas.
+É o caminho certo para um domínio pequeno: 13 contas, e o papel de cada uma
+muda raramente. Se um dia existir um grupo criado **exatamente** para definir
+papel no ITSM, acrescente-o ao mapa — a lista é ordenada, com o papel mais
+privilegiado primeiro.
 
-Os nomes acima são um **palpite** — troque pelos que o `ldap_check --user`
-mostrou.
+`Domain Admins` → `admin` fica porque é o grupo da própria administração do
+domínio. Vale saber do acoplamento: quem for adicionado a `Domain Admins` por
+um motivo de infraestrutura ganha o ITSM inteiro. Para desacoplar, esvazie o
+mapa — e aí até o primeiro administrador do ITSM é definido à mão.
 
-Quem autentica e não está em nenhum grupo do mapa entra como
-`LDAP_DEFAULT_ROLE`, que é Solicitante: o menor privilégio.
+## Conferir as contas em massa
+
+```powershell
+python manage.py ldap_check --user joao.silva --list
+```
+
+Faz o bind uma vez (a senha é pedida só uma vez) e mostra, para cada conta de
+pessoa do diretório, o que o ITSM leria dela e o papel que ela receberia:
+
+```
+  CONTA                 NOME                      E-MAIL                        DEPARTAMENTO      PAPEL
+  ----------------------------------------------------------------------------------------------------
+  joao.silva         Thiago Araujo             joao.silva@exemplo.local     TI                Administrador
+  paulo.silva           Paulo Silva               paulo.silva@exemplo.local       —                 Solicitante (padrão)
+
+  13 conta(s).
+  [aviso] 1 sem e-mail: não receberão as notificações por e-mail do ITSM.
+```
+
+As contas de **computador** ficam de fora: no AD elas também têm
+`objectClass=user` e a lista viria com os PCs do domínio no meio das pessoas.
+
+A listagem usa as **mesmas funções** do login (`_montar_usuario`,
+`papel_para_grupos`), então o que ela mostra é o que o login gravaria — uma
+segunda implementação divergiria na primeira mudança.
 
 ## Passo 3 — ligar
 
@@ -313,7 +333,7 @@ O `ldap_check --user` avisa quando a conta está sem eles:
 
 ## Testes
 
-55 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
+63 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
 estratégias:
 
 1. A maioria substitui `ldap_backend.autenticar` por uma função falsa e
@@ -329,6 +349,9 @@ Dois testes merecem destaque porque fixam comportamentos de segurança:
 - **senha em branco não chega ao servidor.** Bind com senha vazia é um bind
   **anônimo**, que o AD aceita — a autenticação "passaria" com a senha em
   branco. Há guarda no backend e no cliente.
+- **grupo de File Server não concede papel.** `MapaDeGruposDoProjetoTests`
+  verifica o mapa que está no `settings.py` de verdade, não um mapa de teste:
+  se algum `GRP-*` voltar para lá, a suíte falha.
 - **username com curinga não casa com qualquer conta.** O que a pessoa digita é
   escapado antes de entrar no filtro LDAP; sem isso, `*` casaria com a primeira
   conta do diretório. É a mesma classe de problema que SQL injection.

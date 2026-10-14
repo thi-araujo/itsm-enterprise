@@ -280,6 +280,37 @@ def _grupos_aninhados(conexao, dn_do_usuario):
     return [str(entrada.cn) for entrada in conexao.entries]
 
 
+def _montar_usuario(entrada, dn, username, grupos=None):
+    """Transforma os atributos lidos do AD num `UsuarioLdap`.
+
+    Compartilhado pelo `autenticar` e pelo `listar_usuarios`, para que a
+    listagem de conferência mostre exatamente o que o login gravaria — uma
+    segunda implementação divergiria na primeira mudança.
+    """
+    if grupos is None:
+        grupos = [_primeiro_rdn(g) for g in (entrada.get('memberOf') or [])]
+
+    first_name = _primeiro(entrada, 'givenName')
+    last_name  = _primeiro(entrada, 'sn')
+    if not first_name and not last_name:
+        # Conta sem `givenName`/`sn` preenchidos é comum em AD montado à mão:
+        # o nome existe só no `displayName`, ou apenas no CN do DN. Sem esta
+        # queda para trás, o ITSM mostraria `joao.silva` em todas as telas
+        # em vez de "Thiago Araujo".
+        first_name, last_name = _dividir_nome(
+            _primeiro(entrada, 'displayName') or _primeiro_rdn(dn))
+
+    return UsuarioLdap(
+        username=_primeiro(entrada, 'sAMAccountName') or username,
+        first_name=first_name,
+        last_name=last_name,
+        email=_primeiro(entrada, 'mail'),
+        department=_primeiro(entrada, 'department'),
+        groups=grupos,
+        dn=dn,
+    )
+
+
 def autenticar(username, password):
     """Valida a credencial no AD e devolve um `UsuarioLdap`, ou None.
 
@@ -320,32 +351,58 @@ def autenticar(username, password):
                            username, settings.LDAP_SEARCH_BASE)
             return None
 
-        grupos = [_primeiro_rdn(g) for g in (entrada.get('memberOf') or [])]
+        grupos = None
         if settings.LDAP_NESTED_GROUPS and dn:
             grupos = _grupos_aninhados(leitura, dn)
 
-        first_name = _primeiro(entrada, 'givenName')
-        last_name  = _primeiro(entrada, 'sn')
-        if not first_name and not last_name:
-            # Conta sem `givenName`/`sn` preenchidos é comum em AD montado à
-            # mão: o nome existe só no `displayName`, ou apenas no CN do DN.
-            # Sem esta queda para trás, o ITSM mostraria `joao.silva` em
-            # todas as telas em vez de "Thiago Araujo".
-            first_name, last_name = _dividir_nome(
-                _primeiro(entrada, 'displayName') or _primeiro_rdn(dn))
-
-        return UsuarioLdap(
-            username=_primeiro(entrada, 'sAMAccountName') or username,
-            first_name=first_name,
-            last_name=last_name,
-            email=_primeiro(entrada, 'mail'),
-            department=_primeiro(entrada, 'department'),
-            groups=grupos,
-            dn=dn,
-        )
+        return _montar_usuario(entrada, dn, username, grupos)
     finally:
         _fechar(conexao)
         _fechar(conexao_servico)
+
+
+def listar_usuarios(username, password, limite=200):
+    """Lista as contas de pessoa do diretório, para conferência.
+
+    Usada só pelo `manage.py ldap_check --list`: é uma ferramenta de
+    diagnóstico, não parte do login. Faz o bind com a credencial informada e
+    devolve `[UsuarioLdap]` ordenado por `sAMAccountName`.
+
+    O filtro exclui as contas de **computador**, que no AD também têm
+    `objectClass=user` — sem isso a lista viria com as máquinas do domínio.
+    A forma usual seria `objectCategory=person`, mas aquilo depende de o AD
+    expandir o nome amigável para o DN da classe, um comportamento só dele;
+    negar `objectClass=computer` é equivalente e vale em qualquer servidor
+    LDAP, o que permite testar isto com o diretório em memória do ldap3.
+    """
+    from ldap3 import SUBTREE
+
+    if not username or not password:
+        return []
+
+    conexao = _conectar(_montar_upn(username), password)
+    if conexao is None:
+        return None   # credencial recusada — diferente de "nenhum usuário"
+
+    try:
+        conexao.search(
+            search_base=settings.LDAP_SEARCH_BASE,
+            search_filter='(&(objectClass=user)(!(objectClass=computer)))',
+            search_scope=SUBTREE,
+            attributes=ATRIBUTOS,
+            size_limit=limite,
+        )
+        encontrados = []
+        for entrada in conexao.entries:
+            atributos = entrada.entry_attributes_as_dict
+            conta = _primeiro(atributos, 'sAMAccountName')
+            if not conta:
+                continue
+            encontrados.append(_montar_usuario(atributos,
+                                               str(entrada.entry_dn), conta))
+        return sorted(encontrados, key=lambda u: u.username.casefold())
+    finally:
+        _fechar(conexao)
 
 
 def testar_conexao():

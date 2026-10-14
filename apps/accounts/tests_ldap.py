@@ -14,6 +14,7 @@ Nenhum teste aqui toca a rede. Há duas estratégias, de propósito:
 
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -451,6 +452,12 @@ def _conexao_falsa():
         'sAMAccountName': 'joao.paulo',
         'displayName':    'João Paulo Souza',
     })
+    # Conta de computador: no AD ela também tem `objectClass=user` e
+    # apareceria na listagem se o filtro não a excluísse.
+    conexao.strategy.add_entry(f'CN=PC-EXEMPLO-01,OU=Computadores,{BASE}', {
+        'objectClass':    ['top', 'person', 'user', 'computer'],
+        'sAMAccountName': 'PC-EXEMPLO-01$',
+    })
     conexao.bind()
     return conexao
 
@@ -527,6 +534,83 @@ class ClienteLdapComServidorFalsoTests(TestCase):
 
     def test_parenteses_no_username_nao_quebram_o_filtro(self):
         self.assertIsNone(autenticar('jo)ao', 'senha'))
+
+
+@override_settings(LDAP_ENABLED=True, LDAP_SEARCH_BASE=BASE,
+                   LDAP_GROUP_ROLE_MAP=MAPA, LDAP_NESTED_GROUPS=False,
+                   LDAP_BIND_DN='')
+class ListagemDeUsuariosTests(TestCase):
+    """`listar_usuarios` — a conferência em massa do `ldap_check --list`."""
+
+    def setUp(self):
+        patch = mock.patch('apps.accounts.ldap_client._conectar',
+                           return_value=_conexao_falsa())
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_lista_as_contas_ordenadas_por_login(self):
+        from .ldap_client import listar_usuarios
+        contas = listar_usuarios('joao', 'senha')
+        self.assertEqual([c.username for c in contas],
+                         ['joao', 'joao.paulo', 'maria.santos'])
+
+    def test_conta_de_computador_fica_fora_da_lista(self):
+        """No AD a máquina também tem `objectClass=user`; sem o filtro, a
+        listagem viria com os PCs do domínio no meio das pessoas."""
+        from .ldap_client import listar_usuarios
+        contas = [c.username for c in listar_usuarios('joao', 'senha')]
+        self.assertNotIn('PC-EXEMPLO-01$', contas)
+
+    def test_a_listagem_le_os_mesmos_dados_que_o_login_gravaria(self):
+        """Usa o mesmo `_montar_usuario` do `autenticar`; uma segunda
+        implementação divergiria na primeira mudança."""
+        from .ldap_client import listar_usuarios
+        contas = {c.username: c for c in listar_usuarios('joao', 'senha')}
+
+        self.assertEqual(contas['joao'].email, 'joao@exemplo.local')
+        self.assertIn('ITSM-Tecnicos', contas['joao'].groups)
+        # A queda para trás do nome vale na listagem também.
+        self.assertEqual(contas['maria.santos'].first_name, 'Maria')
+        self.assertEqual(contas['joao.paulo'].last_name, 'Paulo Souza')
+
+    def test_sem_credencial_nao_consulta(self):
+        from .ldap_client import listar_usuarios
+        self.assertEqual(listar_usuarios('joao', ''), [])
+
+    def test_credencial_recusada_devolve_none_e_nao_lista_vazia(self):
+        """None e `[]` significam coisas diferentes: "não entrei" contra
+        "entrei e o diretório está vazio"."""
+        from .ldap_client import listar_usuarios
+        with mock.patch('apps.accounts.ldap_client._conectar',
+                        return_value=None):
+            self.assertIsNone(listar_usuarios('joao', 'senha'))
+
+
+class MapaDeGruposDoProjetoTests(TestCase):
+    """O `LDAP_GROUP_ROLE_MAP` que está no settings — não um mapa de teste.
+
+    Os grupos `GRP-*` do domínio exemplo.local são do File Server e são
+    concedidos por GPO. Se algum deles entrar no mapa, quem recebeu acesso a
+    um compartilhamento ganha privilégio de atendimento no ITSM sem ninguém
+    ter decidido isso. Este teste falha se isso acontecer.
+    """
+
+    GRUPOS_DE_ARQUIVO = ['GRP-Geral', 'GRP-Arquivos', 'GRP-Documentos',
+                         'GRP-Cofre', 'GRP-Technical', 'GRP-Admins']
+
+    def test_grupo_de_file_server_nao_concede_papel(self):
+        for grupo in self.GRUPOS_DE_ARQUIVO:
+            with self.subTest(grupo=grupo):
+                self.assertIsNone(papel_para_grupos([grupo]))
+
+    def test_conta_so_com_grupos_de_arquivo_entra_como_solicitante(self):
+        self.assertIsNone(papel_para_grupos(self.GRUPOS_DE_ARQUIVO))
+        self.assertEqual(settings.LDAP_DEFAULT_ROLE,
+                         UserProfile.ROLE_REQUESTER)
+
+    def test_domain_admins_concede_administrador(self):
+        self.assertEqual(papel_para_grupos(['Domain Admins']),
+                         UserProfile.ROLE_ADMIN)
 
 
 class DivisaoDoNomeTests(TestCase):

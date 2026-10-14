@@ -231,18 +231,21 @@ LDAP_USER_FILTER = '(&(objectClass=user)(sAMAccountName={username}))'
 # então o papel mais privilegiado vem primeiro.
 #
 # Nomes conferidos no domínio exemplo.local em 14/10/2026 com
-# `manage.py ldap_check --user joao.silva`. Para ver os grupos de outra
-# conta, rode o mesmo comando com ela.
+# `manage.py ldap_check --user joao.silva`.
+#
+# Os grupos GRP-* do domínio são do **File Server** e são concedidos por GPO,
+# automaticamente. Eles ficam FORA deste mapa de propósito: ligar
+# `GRP-Technical` ao papel de Técnico daria privilégio de atendimento a quem
+# só recebeu acesso a um compartilhamento — escalonamento de privilégio pela
+# GPO, sem ninguém ter decidido isso.
+#
+# Logo: só `Domain Admins` concede papel automaticamente. Todo o resto entra
+# como LDAP_DEFAULT_ROLE (Solicitante) e o papel de Técnico/Gerente é dado à
+# mão em /admin/ → Perfis de Acesso. O login seguinte pelo AD **não**
+# sobrescreve esse ajuste, porque sem grupo casando o papel atual é mantido.
 LDAP_GROUP_ROLE_MAP = [
-    ('GRP-Admins',     'admin'),
-    ('Domain Admins',  'admin'),
-    ('GRP-Managers',   'manager'),     # ainda não existe no AD — criar
-    ('GRP-Technical',  'technician'),
+    ('Domain Admins', 'admin'),
 ]
-# Os demais grupos do domínio (GRP-Geral, GRP-Arquivos, GRP-Documentos,
-# GRP-Cofre) ficaram fora de propósito: não são papéis de atendimento, e
-# qualquer grupo não listado aqui simplesmente não concede privilégio —
-# a pessoa entra como LDAP_DEFAULT_ROLE.
 
 # Papel de quem autentica no AD mas não está em nenhum grupo do mapa.
 # Solicitante é o menor privilégio.
