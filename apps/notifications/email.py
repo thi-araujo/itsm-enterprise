@@ -3,6 +3,7 @@ import logging
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone
 from apps.accounts.models import UserProfile
 from .models import Notification
 
@@ -251,6 +252,47 @@ def notify_comment_added(comment):
         _create_notification(
             user, 'comment_added',
             f"Comentário no ticket #{ticket.pk:04d}",
+            body, ticket_id=ticket.pk
+        )
+
+
+def notify_sla_warning(ticket):
+    """Aviso prévio: o prazo está perto de estourar (Fase 3.7).
+
+    Vai para o técnico responsável e, se não houver nenhum, para a equipe —
+    um chamado sem responsável perto de vencer é problema de todos.
+    """
+    if ticket.assignee:
+        destinatarios = [ticket.assignee]
+    else:
+        destinatarios = list(_equipe())
+
+    restante = ticket.sla_remaining_hours
+    percentual = ticket.sla_elapsed_percent
+    vencimento = (timezone.localtime(ticket.sla_deadline).strftime('%d/%m/%Y %H:%M')
+                  if ticket.sla_deadline else '—')
+
+    subject = f"[ITSM Enterprise] ⏰ SLA em risco — Ticket #{ticket.pk:04d}"
+    body = (
+        f"O prazo deste chamado está perto de vencer.\n\n"
+        f"  ID:          #{ticket.pk:04d}\n"
+        f"  Título:      {ticket.title}\n"
+        f"  Prioridade:  {ticket.get_priority_display()}\n"
+        f"  Responsável: {ticket.assignee.username if ticket.assignee else 'Não atribuído'}\n"
+        f"  Vence em:    {vencimento}\n"
+        f"  Decorrido:   {percentual}% do prazo"
+        f"{f' — restam cerca de {restante}h' if restante is not None else ''}\n\n"
+        f"Se o prazo estourar, o chamado é escalonado automaticamente para a "
+        f"gerência.\n\n"
+        f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
+        f"— ITSM Enterprise"
+    )
+    emails = [u.email for u in destinatarios if u.email]
+    _send_email(subject, body, emails)
+    for user in destinatarios:
+        _create_notification(
+            user, 'sla_warning',
+            f"⏰ SLA em risco: #{ticket.pk:04d} ({percentual}% do prazo)",
             body, ticket_id=ticket.pk
         )
 

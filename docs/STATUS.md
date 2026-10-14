@@ -222,7 +222,56 @@ Prioridade, Técnico) → nota interna → escalonamento (`escalated` + Técnico
 finalização (Status, Solução). 12 entradas, nenhuma sem autor; `Paulo` não vê o
 cartão nem o texto no HTML; salvar sem alterar nada não gera entrada.
 
-### 3.5 a 3.8
+### ✅ 3.7 — Automações por SLA — Concluída
+- [x] `sla_started_at` no `Ticket` — sem saber quando o relógio começou não dá
+      para dizer "já passou 80% do prazo". Calcular `sla_deadline - 24h` erraria
+      se a prioridade tivesse sido alterada depois da abertura
+- [x] Migração de dados `0008` (reversível) preenchendo `sla_started_at` com o
+      `created_at` nos 13 chamados existentes — valor correto, nenhum deles
+      passou por aprovação
+- [x] `sla_elapsed_percent` e `sla_at_risk` no model; `start_sla()` da Fase 3.3
+      passou a marcar o início
+- [x] **Aviso prévio** a partir de `SLA_WARNING_PERCENT` (80%) — o tipo de
+      notificação `sla_warning` existia desde a Fase 2 e nunca havia sido usado.
+      Vai para o responsável, ou para a equipe se o chamado não tiver dono
+- [x] **Escalonamento automático** do chamado vencido para o **gerente com
+      menos chamados ativos** (desempate por `username`, para ser
+      determinístico) — pegar sempre o primeiro empilharia tudo na mesma pessoa
+- [x] Reaproveita `Escalation` (3.2) com `from_user` nulo e `AuditLog` (3.4)
+      com autor nulo → a trilha mostra **"Sistema — Escalonou para Gerente Um"**
+- [x] Pula o chamado que já está com gerente/admin (marca para não reavaliar,
+      sem trocar o responsável) e não quebra se não houver nenhum gerente
+- [x] **Não altera prioridade nem prazo**: a prioridade é a origem do SLA e
+      mexer nela depois do vencimento apagaria a evidência do furo
+- [x] Lógica em `apps/tickets/automation.py`, separada do comando — testável
+      sem rodar o comando e reutilizável por Celery/API depois
+- [x] `check_sla` ganhou `--dry-run` e `--quiet`; passou a usar
+      `Ticket.CLOSED_STATUSES` em vez da lista `['resolved','closed']` cravada,
+      que era de antes da Fase 3.3 e ignorava `rejected`
+- [x] Limites em `settings.py` (`SLA_WARNING_PERCENT`, `SLA_AUTO_ESCALATE`),
+      exercitados nos testes com `@override_settings`
+- [x] Painel de SLA do chamado mostra "Prazo decorrido %" e a data do
+      escalonamento automático
+- [x] `docs/AUTOMACAO_SLA.md` com o comando pronto do Agendador de Tarefas
+      do Windows (de 15 em 15 minutos) e `logs/` no `.gitignore`
+- [x] 41 testes novos — suíte total: **201 testes**
+
+**Migrações:** `tickets.0007` (3 campos) e `tickets.0008_preenche_sla_started_at`
+(dados, reversível).
+
+**Idempotência:** `sla_warning_notified`, `sla_breach_notified` e
+`sla_escalated_at` garantem que rodar de 15 em 15 minutos não repete trabalho.
+
+**Execução real verificada no banco de desenvolvimento** (transação revertida):
+1 aviso de risco a 85% do prazo; 9 chamados vencidos processados — 7 repassados
+e distribuídos entre `admin`, `Thiago` e `gerente1` (**3 chamados ativos para
+cada um**, carga equilibrada), 2 pulados por já estarem com a gerência; trilha
+mostrando "Sistema"; **segunda execução não repetiu nada** (0 · 0 · 0).
+
+> ⚠️ A primeira execução real vai processar o acúmulo dos 9 chamados vencidos
+> de uma vez, com os e-mails correspondentes. Rode `--dry-run` antes.
+
+### 3.5, 3.6 e 3.8
 - [ ] API REST (DRF)
 - [ ] Dashboard avançado
 - [ ] Automações (escalonamento por SLA)

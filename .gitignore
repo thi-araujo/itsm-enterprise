@@ -9,6 +9,9 @@ __pycache__/
 
 # Django
 staticfiles/
+
+# Log do comando agendado check_sla (ver docs/AUTOMACAO_SLA.md)
+logs/
 db.sqlite3
 media/
 

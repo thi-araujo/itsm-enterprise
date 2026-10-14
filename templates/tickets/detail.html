@@ -375,12 +375,29 @@
         </div>
         <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--itsm-border);">
           <span style="color:var(--itsm-muted);">Tempo restante</span>
-          <span class="{% if ticket.is_sla_breached %}sla-breached{% elif ticket.sla_remaining_hours is not None and ticket.sla_remaining_hours < 2 %}text-warning{% else %}text-success{% endif %}">
+          <span class="{% if ticket.is_sla_breached %}sla-breached{% elif ticket.sla_at_risk %}sla-warn{% else %}text-success{% endif %}">
             {% if ticket.is_sla_breached %}VENCIDO
             {% elif ticket.sla_remaining_hours is not None %}{{ ticket.sla_remaining_hours }}h
             {% else %}—{% endif %}
           </span>
         </div>
+        {# Percentual do prazo já decorrido (Fase 3.7) — o aviso prévio sai
+           do mesmo limite, SLA_WARNING_PERCENT no settings. #}
+        {% if ticket.sla_elapsed_percent is not None %}
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--itsm-border);">
+          <span style="color:var(--itsm-muted);">Prazo decorrido</span>
+          <span class="{% if ticket.is_sla_breached %}sla-breached{% elif ticket.sla_at_risk %}sla-warn{% else %}sla-ok{% endif %}">
+            {% if ticket.sla_at_risk %}<i class="bi bi-alarm me-1"></i>{% endif %}
+            {{ ticket.sla_elapsed_percent }}%
+          </span>
+        </div>
+        {% endif %}
+        {% if ticket.sla_escalated_at %}
+        <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--itsm-border);">
+          <span style="color:var(--itsm-muted);">Escalonado por SLA</span>
+          <span class="sla-breached">{{ ticket.sla_escalated_at|date:"d/m H:i" }}</span>
+        </div>
+        {% endif %}
         <div style="display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--itsm-border);">
           <span style="color:var(--itsm-muted);">Criado</span>
           <span>{{ ticket.created_at|date:"d/m/Y H:i" }}</span>

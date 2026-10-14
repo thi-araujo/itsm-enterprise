@@ -120,6 +120,22 @@ MAX_UPLOAD_SIZE_MB = 10
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
+# ──────────────────────────────────────────────────────────────────
+# Automações de SLA (Fase 3.7) — usadas por apps/tickets/automation.py
+# e pelo comando `manage.py check_sla`.
+#
+# As horas de cada prioridade (Crítica 2h · Alta 8h · Média 24h · Baixa 72h)
+# ficam no model, em Ticket.sla_hours_for_priority.
+# ──────────────────────────────────────────────────────────────────
+
+# Percentual do prazo a partir do qual o chamado é considerado em risco e
+# recebe o aviso prévio.
+SLA_WARNING_PERCENT = 80
+
+# Liga o escalonamento automático do chamado vencido para um gerente.
+# Em False, o comando só avisa e não reatribui ninguém.
+SLA_AUTO_ESCALATE = True
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Autenticação — nomes de URL definidos em accounts/urls.py e dashboard/urls.py.

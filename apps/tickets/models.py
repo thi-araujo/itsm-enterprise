@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -102,6 +103,18 @@ class Ticket(models.Model):
 
     # SLA
     sla_deadline = models.DateTimeField(null=True, blank=True, verbose_name="Prazo SLA")
+    # Quando o relógio começou (Fase 3.7). Sem este campo não dá para dizer
+    # "já passou 80% do prazo": calcular `sla_deadline - 24h` erraria se a
+    # prioridade tivesse sido alterada depois da abertura.
+    sla_started_at = models.DateTimeField(null=True, blank=True,
+                                          verbose_name="SLA iniciado em")
+    # Controle de idempotência das automações: o comando roda de 15 em 15
+    # minutos e não pode reavisar nem reescalonar o mesmo chamado.
+    sla_warning_notified = models.BooleanField(default=False,
+                                               verbose_name="Aviso de SLA enviado")
+    # DateTimeField e não BooleanField: serve de marca e de registro de quando.
+    sla_escalated_at = models.DateTimeField(null=True, blank=True,
+                                            verbose_name="Escalonado por SLA em")
 
     # Atendimento (Fase 3.2)
     solution    = models.TextField(blank=True, verbose_name="Solução")
@@ -201,9 +214,32 @@ class Ticket(models.Model):
             return max(0, int(delta.total_seconds() // 3600))
         return None
 
-    def sla_hours_for_priority(self):
-        """Horas de SLA da prioridade atual (CLAUDE.md: 2 · 8 · 24 · 72)."""
-        return {'critical': 2, 'high': 8, 'medium': 24, 'low': 72}.get(self.priority, 24)
+    @property
+    def sla_elapsed_percent(self):
+        """Quanto do prazo já passou, em porcentagem (Fase 3.7).
+
+        Devolve None quando não há prazo contando — chamado aguardando
+        aprovação, resolvido, fechado ou rejeitado. Passa de 100 quando o
+        prazo já estourou.
+        """
+        if not self.sla_deadline or self.status in self.CLOSED_STATUSES:
+            return None
+        inicio = self.sla_started_at or self.created_at
+        if not inicio:
+            return None
+        total = (self.sla_deadline - inicio).total_seconds()
+        if total <= 0:
+            return 100
+        decorrido = (timezone.now() - inicio).total_seconds()
+        return max(0, int(decorrido / total * 100))
+
+    @property
+    def sla_at_risk(self):
+        """Passou do limite de aviso do settings e ainda não venceu."""
+        percentual = self.sla_elapsed_percent
+        if percentual is None:
+            return False
+        return percentual >= settings.SLA_WARNING_PERCENT and not self.is_sla_breached
 
     def start_sla(self):
         """Inicia a contagem do SLA a partir de agora.
@@ -213,8 +249,14 @@ class Ticket(models.Model):
         que ficou o fim de semana parado já estaria vencido antes de alguém
         poder atendê-lo.
         """
-        self.sla_deadline = timezone.now() + timezone.timedelta(
+        agora = timezone.now()
+        self.sla_started_at = agora
+        self.sla_deadline = agora + timezone.timedelta(
             hours=self.sla_hours_for_priority())
+
+    def sla_hours_for_priority(self):
+        """Horas de SLA da prioridade atual (CLAUDE.md: 2 · 8 · 24 · 72)."""
+        return {'critical': 2, 'high': 8, 'medium': 24, 'low': 72}.get(self.priority, 24)
 
     # ──────────────────────────────────────────────────────────────
     # Auditoria (Fase 3.4)
@@ -320,7 +362,9 @@ class Ticket(models.Model):
         # SLA automático ao criar — exceto aguardando aprovação, onde o
         # relógio só começa quando o gerente liberar (ver start_sla).
         if not self.pk and not self.sla_deadline and not self.is_awaiting_approval:
-            self.sla_deadline = timezone.now() + timezone.timedelta(
+            agora = timezone.now()
+            self.sla_started_at = agora
+            self.sla_deadline = agora + timezone.timedelta(
                 hours=self.sla_hours_for_priority())
         # Registra data de resolução
         if self.status == 'resolved' and not self.resolved_at:

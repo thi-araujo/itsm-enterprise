@@ -10,6 +10,7 @@ Mantenha-o curto e atualizado. Detalhes longos ficam em `docs/`.
 - **Sistema operacional de desenvolvimento:** Windows 11 + PowerShell + PyCharm
 - **Roadmap completo:** ver @docs/ROADMAP.md
 - **Status de cada fase:** ver @docs/STATUS.md
+- **Automações de SLA e agendamento:** ver @docs/AUTOMACAO_SLA.md
 
 ## Regras obrigatórias
 1. O nome do sistema é **ITSM Enterprise**. A palavra "RAVEN" (e variações `raven`, `Raven`) NÃO deve existir em nenhum arquivo, classe CSS, variável, template, e-mail ou comentário.
@@ -30,7 +31,8 @@ python manage.py check                      # validar o projeto
 python manage.py makemigrations             # gerar migrações
 python manage.py migrate                    # aplicar migrações
 python manage.py runserver 0.0.0.0:8000     # rodar acessível na rede local
-python manage.py check_sla                  # verificar SLAs vencidos
+python manage.py check_sla                  # automações de SLA (aviso, vencimento, escalonamento)
+python manage.py check_sla --dry-run        # mostra o que faria, sem gravar
 python manage.py createsuperuser            # criar admin
 ```
 
