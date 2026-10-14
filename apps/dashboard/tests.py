@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.accounts.testing import criar_admin
 from apps.tickets.models import Ticket
 
 
@@ -13,7 +14,7 @@ class SlaRiskTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('d', 'd@exemplo.local', 'x')
+        cls.user = criar_admin('d')
         agora = timezone.now()
         vencido = agora - timezone.timedelta(hours=1)
         futuro  = agora + timezone.timedelta(hours=5)

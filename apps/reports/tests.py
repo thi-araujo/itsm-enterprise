@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.accounts.testing import criar_gerente
 from apps.tickets.models import Ticket
 
 
@@ -13,7 +14,7 @@ class SlaCumpridoTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.tecnico = User.objects.create_user('r', 'r@exemplo.local', 'x', is_staff=True)
+        cls.tecnico = criar_gerente('r')
         agora = timezone.now()
 
         def criar(titulo, resolvido_em, prazo):

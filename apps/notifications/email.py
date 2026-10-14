@@ -3,7 +3,13 @@ import logging
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.models import User
+from apps.accounts.models import UserProfile
 from .models import Notification
+
+
+def _equipe():
+    """Usuários que recebem avisos de chamado: técnico, gerente e admin."""
+    return User.objects.filter(profile__role__in=UserProfile.STAFF_ROLES)
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +45,7 @@ def _send_email(subject, body, recipients):
 
 
 def notify_ticket_created(ticket):
-    admins = User.objects.filter(is_staff=True).exclude(email='')
-    emails = list(admins.values_list('email', flat=True))
+    emails = list(_equipe().exclude(email='').values_list('email', flat=True))
     subject = f"[ITSM Enterprise] Novo Ticket #{ticket.pk:04d} — {ticket.get_priority_display()}"
     body = (
         f"Um novo ticket foi aberto.\n\n"
@@ -55,9 +60,9 @@ def notify_ticket_created(ticket):
         f"— ITSM Enterprise"
     )
     _send_email(subject, body, emails)
-    for admin in User.objects.filter(is_staff=True):
+    for membro in _equipe():
         _create_notification(
-            admin, 'ticket_created',
+            membro, 'ticket_created',
             f"Novo ticket #{ticket.pk:04d}: {ticket.title[:60]}",
             body, ticket_id=ticket.pk
         )
@@ -135,7 +140,7 @@ def notify_comment_added(comment):
 def notify_sla_breach(ticket):
     if ticket.sla_breach_notified:
         return
-    notify_users = list(User.objects.filter(is_staff=True))
+    notify_users = list(_equipe())
     if ticket.assignee and ticket.assignee not in notify_users:
         notify_users.append(ticket.assignee)
 

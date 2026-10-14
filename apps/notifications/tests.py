@@ -10,6 +10,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from apps.accounts.testing import criar_solicitante, criar_tecnico
 from apps.notifications.email import notify_ticket_created, notify_sla_breach
 from apps.notifications.models import Notification
 from apps.tickets.models import Ticket
@@ -26,7 +27,7 @@ class EnvioDeEmailTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.tecnico = User.objects.create_user('n', 'n@exemplo.local', 'x', is_staff=True)
+        cls.tecnico = criar_tecnico('n')
         cls.ticket = Ticket.objects.create(title='t', description='d',
                                            requester=cls.tecnico, priority='low')
 
@@ -73,7 +74,7 @@ class SlaBreachTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.tecnico = User.objects.create_user('s', 's@exemplo.local', 'x', is_staff=True)
+        cls.tecnico = criar_tecnico('s')
         cls.ticket = Ticket.objects.create(title='t', description='d',
                                            requester=cls.tecnico, priority='critical')
 
@@ -91,7 +92,7 @@ class TelaDeNotificacoesTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('v', 'v@exemplo.local', 'x')
+        cls.user = criar_solicitante('v')
         for i in range(3):
             Notification.objects.create(user=cls.user, type='ticket_created',
                                         title=f'n{i}', message='m')

@@ -6,10 +6,13 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 
+from apps.accounts.models import UserProfile
+from apps.accounts.permissions import management_required
 from apps.tickets.models import Ticket
 
 
 @login_required
+@management_required
 def report_dashboard(request):
     days  = int(request.GET.get('days', 30))
     since = timezone.now() - timedelta(days=days)
@@ -98,10 +101,12 @@ def report_dashboard(request):
 
 
 @login_required
+@management_required
 def report_technician(request):
     days  = int(request.GET.get('days', 30))
     since = timezone.now() - timedelta(days=days)
-    techs = User.objects.filter(is_staff=True)
+    techs = User.objects.filter(
+        profile__role__in=UserProfile.STAFF_ROLES).select_related('profile')
     data  = []
 
     for tech in techs:

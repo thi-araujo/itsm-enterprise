@@ -29,12 +29,15 @@
             <i class="bi bi-grid-1x2"></i> Dashboard
         </a>
         <a href="{% url 'tickets:list' %}" class="sb-link {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'tickets' %}active{% endif %}">
-            <i class="bi bi-ticket-perforated"></i> Tickets
+            <i class="bi bi-ticket-perforated"></i>
+            {% if user.profile.can_see_all_tickets %}Tickets{% else %}Meus Chamados{% endif %}
         </a>
+        {% if user.profile.can_see_queue %}
         <a href="{% url 'tickets:queue' %}" class="sb-link {% if request.resolver_match.url_name == 'queue' %}active{% endif %}">
             <i class="bi bi-layers"></i> Fila de Atendimento
             <span class="sb-badge sb-badge-warn" id="unassigned-count" style="display:none;"></span>
         </a>
+        {% endif %}
         <a href="{% url 'tickets:create' %}" class="sb-link">
             <i class="bi bi-plus-circle"></i> Novo Chamado
         </a>
@@ -46,31 +49,48 @@
         <a href="{% url 'tickets:list' %}?priority=critical" class="sb-link">
             <i class="bi bi-exclamation-octagon" style="color:#c4b5fd;"></i> Críticos
         </a>
+        {% if user.profile.can_see_all_tickets %}
         <a href="{% url 'tickets:list' %}?assignee=me" class="sb-link">
-            <i class="bi bi-person-check" style="color:#34d399;"></i> Meus Tickets
+            <i class="bi bi-person-check" style="color:#34d399;"></i> Atribuídos a Mim
         </a>
         <a href="{% url 'tickets:list' %}?assignee=unassigned" class="sb-link">
             <i class="bi bi-person-x" style="color:#fbbf24;"></i> Sem Técnico
         </a>
+        {% endif %}
 
-        <div class="sb-section" style="margin-top:.5rem;">CMDB & Relatórios</div>
+        {% if user.profile.can_see_cmdb or user.profile.can_see_reports %}
+        <div class="sb-section" style="margin-top:.5rem;">
+            {% if user.profile.can_see_cmdb and user.profile.can_see_reports %}CMDB &amp; Relatórios
+            {% elif user.profile.can_see_cmdb %}CMDB
+            {% else %}Relatórios{% endif %}
+        </div>
+        {% if user.profile.can_see_cmdb %}
         <a href="{% url 'cmdb:list' %}" class="sb-link {% if request.resolver_match.app_name == 'cmdb' %}active{% endif %}">
             <i class="bi bi-hdd-network"></i> CMDB — Ativos
         </a>
+        {% endif %}
+        {% if user.profile.can_see_reports %}
         <a href="{% url 'reports:dashboard' %}" class="sb-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">
             <i class="bi bi-bar-chart-line"></i> Relatórios
         </a>
+        {% endif %}
+        {% endif %}
 
         <div class="sb-section" style="margin-top:.5rem;">Sistema</div>
         <a href="{% url 'notifications:list' %}" class="sb-link {% if request.resolver_match.app_name == 'notifications' %}active{% endif %}">
             <i class="bi bi-bell"></i> Notificações
             <span class="sb-badge" id="notif-sb-count" style="display:none;"></span>
         </a>
+        {% if user.is_staff %}
         <a href="/admin/" class="sb-link"><i class="bi bi-shield-lock"></i> Admin</a>
+        {% endif %}
     </nav>
 
     <div class="sb-footer">
         <div class="sb-user"><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</div>
+        <div style="font-size:.68rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;margin:.1rem 0 .3rem 0;">
+            {{ user.profile.get_role_display }}
+        </div>
         <a href="{% url 'accounts:logout' %}" class="sb-link" style="padding:.35rem 0; border-left:none;">
             <i class="bi bi-box-arrow-left"></i> Sair
         </a>

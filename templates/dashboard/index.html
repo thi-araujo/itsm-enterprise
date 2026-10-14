@@ -94,7 +94,7 @@
   <div class="col-lg-4">
     <div class="itsm-card" style="height:100%;">
       <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);">
-        <span style="font-weight:600;font-size:.9rem;"><i class="bi bi-person-check me-2" style="color:var(--itsm-accent);"></i>Meus Chamados</span>
+        <span style="font-weight:600;font-size:.9rem;"><i class="bi bi-person-check me-2" style="color:var(--itsm-accent);"></i>{% if perfil.can_attend %}Atribuídos a Mim{% else %}Meus Chamados{% endif %}</span>
       </div>
       <div style="padding:.75rem;">
         {% for t in my_tickets %}
@@ -110,7 +110,7 @@
         {% empty %}
         <div style="text-align:center;color:var(--itsm-muted);padding:2rem;font-size:.85rem;">
           <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
-          Nenhum ticket atribuído
+          {% if perfil.can_attend %}Nenhum ticket atribuído{% else %}Você ainda não abriu chamados{% endif %}
         </div>
         {% endfor %}
       </div>

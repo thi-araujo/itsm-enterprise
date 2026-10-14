@@ -20,6 +20,22 @@ class Category(models.Model):
         return self.name
 
 
+class TicketQuerySet(models.QuerySet):
+    """Consultas de Ticket que dependem do perfil de acesso (RBAC)."""
+
+    def visible_to(self, user):
+        """Restringe aos chamados que o usuário pode ver.
+
+        Técnico, gerente e administrador veem todos. Solicitante vê apenas os
+        que ele mesmo abriu. Centralizar isso aqui — e não espalhar `if` pelas
+        views — garante que nenhuma tela esqueça o filtro.
+        """
+        perfil = getattr(user, 'profile', None)
+        if perfil is not None and perfil.can_see_all_tickets:
+            return self
+        return self.filter(requester=user)
+
+
 class Ticket(models.Model):
     PRIORITY_CHOICES = [
         ('low',      'Baixa'),
@@ -69,6 +85,8 @@ class Ticket(models.Model):
     sla_breach_notified = models.BooleanField(default=False, verbose_name="SLA notificado")
     asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True,
                               related_name='tickets', verbose_name="Ativo vinculado")
+
+    objects = TicketQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Ticket"

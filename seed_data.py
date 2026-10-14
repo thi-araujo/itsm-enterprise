@@ -7,6 +7,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'itsm_project.settings')
 django.setup()
 
 from django.contrib.auth.models import User
+from apps.accounts.models import UserProfile
 from apps.tickets.models import Category, Ticket
 
 # Superuser
@@ -14,16 +15,38 @@ if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser('admin', 'admin@exemplo.local', 'admin')
     print("Superuser admin criado (senha: admin)")
 
-# Técnico
+# Administrador
 if not User.objects.filter(username='thiago').exists():
     u = User.objects.create_user('thiago', 'thiago@exemplo.local', 'thiago123')
     u.first_name = 'Thiago'
     u.last_name = 'Analista'
+    u.is_staff = True
+    u.is_superuser = True
     u.save()
     print("Usuário thiago criado (senha: thiago123)")
 
+# Técnico — usado para testar o RBAC sem privilégio de administrador
+if not User.objects.filter(username='tecnico1').exists():
+    u = User.objects.create_user('tecnico1', 'tecnico1@exemplo.local', 'tecnico123')
+    u.first_name = 'Técnico'
+    u.last_name = 'Um'
+    u.save()
+    print("Usuário tecnico1 criado (senha: tecnico123)")
+
 admin = User.objects.get(username='admin')
 thiago = User.objects.get(username='thiago')
+tecnico1 = User.objects.get(username='tecnico1')
+
+# Perfis de acesso (RBAC). O signal cria o perfil; aqui definimos o papel.
+for usuario, papel in [
+    (admin,    UserProfile.ROLE_ADMIN),
+    (thiago,   UserProfile.ROLE_ADMIN),
+    (tecnico1, UserProfile.ROLE_TECHNICIAN),
+]:
+    if usuario.profile.role != papel:
+        usuario.profile.role = papel
+        usuario.profile.save()
+        print(f"Perfil de {usuario.username}: {usuario.profile.get_role_display()}")
 
 # Categorias
 cats = [

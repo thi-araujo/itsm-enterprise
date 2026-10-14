@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+
+from apps.accounts.permissions import staff_required
 from django.contrib import messages
 from django.db.models import Q
 from .models import Asset, AssetType
@@ -7,6 +9,7 @@ from .forms import AssetForm
 
 
 @login_required
+@staff_required
 def asset_list(request):
     assets = Asset.objects.select_related('asset_type', 'owner')
 
@@ -41,6 +44,7 @@ def asset_list(request):
 
 
 @login_required
+@staff_required
 def asset_detail(request, pk):
     asset   = get_object_or_404(Asset, pk=pk)
     tickets = asset.tickets.select_related(
@@ -53,6 +57,7 @@ def asset_detail(request, pk):
 
 
 @login_required
+@staff_required
 def asset_create(request):
     if request.method == 'POST':
         form = AssetForm(request.POST)
@@ -66,6 +71,7 @@ def asset_create(request):
 
 
 @login_required
+@staff_required
 def asset_edit(request, pk):
     asset = get_object_or_404(Asset, pk=pk)
     if request.method == 'POST':

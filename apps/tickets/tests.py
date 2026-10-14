@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.accounts.testing import criar_admin, criar_solicitante, criar_tecnico
 from apps.tickets.models import Attachment, Category, Ticket
 
 
@@ -19,8 +20,7 @@ class TicketSemTecnicoTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.tecnico = User.objects.create_user('tecnico', 'tecnico@exemplo.local',
-                                               'x', is_staff=True)
+        cls.tecnico = criar_admin('equipe')
         cls.categoria = Category.objects.create(name='Rede')
         cls.sem_tecnico = Ticket.objects.create(
             title='Impressora sem tinta', description='Trocar toner',
@@ -79,7 +79,7 @@ class SlaTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('sla', 'sla@exemplo.local', 'x')
+        cls.user = criar_solicitante('sla')
 
     def test_prazo_definido_por_prioridade(self):
         esperado = {'critical': 2, 'high': 8, 'medium': 24, 'low': 72}
@@ -120,7 +120,7 @@ class UploadDeAnexoTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('up', 'up@exemplo.local', 'x', is_staff=True)
+        cls.user = criar_tecnico('up')
         cls.ticket = Ticket.objects.create(title='t', description='d',
                                            requester=cls.user, priority='low')
 
@@ -194,7 +194,7 @@ class PoliticaNosTemplatesTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('tpl', 'tpl@exemplo.local', 'x')
+        cls.user = criar_solicitante('tpl')
         cls.ticket = Ticket.objects.create(title='t', description='d',
                                            requester=cls.user, priority='low')
 
@@ -220,7 +220,7 @@ class NotificacaoNaoDerrubaOFluxoTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('nt', 'nt@exemplo.local', 'x', is_staff=True)
+        cls.user = criar_tecnico('nt')
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -254,7 +254,7 @@ class AcessoRestritoTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('a', 'a@exemplo.local', 'x')
+        cls.user = criar_solicitante('a')
         cls.ticket = Ticket.objects.create(title='t', description='d',
                                            requester=cls.user, priority='low')
 

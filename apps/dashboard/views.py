@@ -7,7 +7,9 @@ from apps.tickets.models import Ticket
 
 @login_required
 def index(request):
-    tickets = Ticket.objects.all()
+    # RBAC: o dashboard do solicitante mostra os números dos chamados dele.
+    tickets = Ticket.objects.visible_to(request.user)
+    perfil  = request.user.profile
     
     stats = {
         'total':       tickets.count(),
@@ -22,12 +24,20 @@ def index(request):
     }
     
     recent_tickets = tickets.select_related('requester', 'assignee', 'category')[:10]
-    my_tickets = tickets.filter(assignee=request.user).exclude(status='closed')[:5]
+
+    # Para a equipe, "meus chamados" são os atribuídos a ela. Para o
+    # solicitante, são os que ele abriu — senão o bloco ficaria sempre vazio.
+    if perfil.can_attend:
+        my_tickets = tickets.filter(assignee=request.user)
+    else:
+        my_tickets = tickets.filter(requester=request.user)
+    my_tickets = my_tickets.exclude(status='closed')[:5]
     
     # Por prioridade
     priority_data = tickets.values('priority').annotate(count=Count('id'))
     
     context = {
+        'perfil': perfil,
         'stats': stats,
         'recent_tickets': recent_tickets,
         'my_tickets': my_tickets,

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.accounts.testing import criar_tecnico
 from apps.cmdb.models import Asset, AssetType
 from apps.tickets.models import Ticket
 
@@ -13,7 +14,7 @@ class AtivoSemResponsavelTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('c', 'c@exemplo.local', 'x')
+        cls.user = criar_tecnico('c')
         cls.tipo = AssetType.objects.create(name='Notebook')
         cls.sem_dono = Asset.objects.create(name='NB-SEM-DONO', asset_tag='PAT-001',
                                             asset_type=cls.tipo)
@@ -46,7 +47,7 @@ class AtivoVinculadoAoTicketTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('c2', 'c2@exemplo.local', 'x')
+        cls.user = criar_tecnico('c2')
         cls.ativo = Asset.objects.create(name='SRV-01', asset_tag='PAT-010')
         cls.ticket = Ticket.objects.create(title='Servidor lento', description='d',
                                            requester=cls.user, priority='high',

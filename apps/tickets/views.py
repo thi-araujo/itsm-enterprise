@@ -8,6 +8,8 @@ from django.conf import settings
 import logging
 import os
 
+from apps.accounts.models import UserProfile
+from apps.accounts.permissions import staff_required
 from .models import Ticket, Comment, Category, Attachment
 from .forms import TicketForm, TicketUpdateForm, CommentForm
 
@@ -47,7 +49,9 @@ def _politica_de_upload():
 
 @login_required
 def ticket_list(request):
-    tickets = Ticket.objects.select_related('requester', 'assignee', 'category')
+    # RBAC: solicitante vê só os próprios chamados (ver Ticket.visible_to).
+    tickets = (Ticket.objects.visible_to(request.user)
+               .select_related('requester', 'assignee', 'category'))
 
     status   = request.GET.get('status', '')
     priority = request.GET.get('priority', '')
@@ -82,11 +86,19 @@ def ticket_list(request):
 
 @login_required
 def ticket_detail(request, pk):
-    ticket       = get_object_or_404(Ticket, pk=pk)
+    # Chamado de outro usuário devolve 404 para o solicitante: um 403
+    # confirmaria que o chamado existe.
+    ticket       = get_object_or_404(Ticket.objects.visible_to(request.user), pk=pk)
+    perfil       = request.user.profile
     comment_form = CommentForm()
     update_form  = TicketUpdateForm(instance=ticket)
     comments     = ticket.comments.select_related('author')
     attachments  = ticket.attachments.select_related('uploaded_by')
+
+    # As notas internas saem do QUERYSET, não do template: esconder com
+    # {% if %} deixaria o texto no HTML, visível no "ver código-fonte".
+    if not perfil.can_see_internal_notes:
+        comments = comments.filter(is_internal=False)
 
     context = {
         'ticket':       ticket,
@@ -94,6 +106,7 @@ def ticket_detail(request, pk):
         'update_form':  update_form,
         'comments':     comments,
         'attachments':  attachments,
+        'perfil':       perfil,
         **_politica_de_upload(),
     }
     return render(request, 'tickets/detail.html', context)
@@ -141,6 +154,7 @@ def ticket_create(request):
 
 
 @login_required
+@staff_required
 def ticket_update_status(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
     if request.method == 'POST':
@@ -161,13 +175,16 @@ def ticket_update_status(request, pk):
 
 @login_required
 def add_comment(request, pk):
-    ticket = get_object_or_404(Ticket, pk=pk)
+    ticket = get_object_or_404(Ticket.objects.visible_to(request.user), pk=pk)
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
             comment = form.save(commit=False)
             comment.ticket = ticket
             comment.author = request.user
+            # Solicitante não cria nota interna, mesmo forjando o POST.
+            if not request.user.profile.can_see_internal_notes:
+                comment.is_internal = False
             comment.save()
             try:
                 from apps.notifications.email import notify_comment_added
@@ -181,7 +198,7 @@ def add_comment(request, pk):
 
 @login_required
 def upload_attachment(request, pk):
-    ticket = get_object_or_404(Ticket, pk=pk)
+    ticket = get_object_or_404(Ticket.objects.visible_to(request.user), pk=pk)
     if request.method == 'POST' and request.FILES.get('file'):
         arquivo      = request.FILES['file']
         aceito, erro = _validar_anexo(arquivo)
@@ -213,7 +230,7 @@ def upload_attachment(request, pk):
 
 @login_required
 def download_attachment(request, pk, att_pk):
-    ticket = get_object_or_404(Ticket, pk=pk)
+    ticket = get_object_or_404(Ticket.objects.visible_to(request.user), pk=pk)
     att    = get_object_or_404(Attachment, pk=att_pk, ticket=ticket)
     if not att.file:
         raise Http404
@@ -223,6 +240,7 @@ def download_attachment(request, pk, att_pk):
 
 
 @login_required
+@staff_required
 def queue_view(request):
     open_tickets = Ticket.objects.filter(
         status__in=['open', 'in_progress', 'waiting']
@@ -230,7 +248,10 @@ def queue_view(request):
 
     unassigned  = open_tickets.filter(assignee__isnull=True)
     my_queue    = open_tickets.filter(assignee=request.user)
-    technicians = User.objects.filter(is_staff=True)
+    # Quem pode receber chamados vem do perfil, não da flag de acesso ao
+    # /admin/ do Django — são coisas diferentes.
+    technicians = User.objects.filter(
+        profile__role__in=UserProfile.STAFF_ROLES).select_related('profile')
 
     context = {
         'unassigned':  unassigned,
@@ -241,13 +262,15 @@ def queue_view(request):
 
 
 @login_required
+@staff_required
 def assign_ticket(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
     if request.method == 'POST':
         tech_id = request.POST.get('assignee_id')
         if tech_id:
             try:
-                tech = User.objects.get(pk=tech_id, is_staff=True)
+                tech = User.objects.get(pk=tech_id,
+                                        profile__role__in=UserProfile.STAFF_ROLES)
                 ticket.assignee = tech
                 if ticket.status == 'open':
                     ticket.status = 'in_progress'
@@ -259,6 +282,7 @@ def assign_ticket(request, pk):
 
 
 @login_required
+@staff_required
 def unassigned_count(request):
     from django.http import JsonResponse
     count = Ticket.objects.filter(

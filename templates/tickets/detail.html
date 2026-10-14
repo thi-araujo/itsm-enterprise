@@ -118,12 +118,16 @@
           {% csrf_token %}
           {{ comment_form.content }}
           <div class="d-flex justify-content-between align-items-center mt-2">
+            {% if perfil.can_see_internal_notes %}
             <div class="form-check">
               {{ comment_form.is_internal }}
               <label class="form-check-label" style="font-size:.8rem;color:var(--itsm-muted);">
                 <i class="bi bi-lock me-1"></i>Nota interna (só técnicos)
               </label>
             </div>
+            {% else %}
+            <span></span>
+            {% endif %}
             <button type="submit" class="btn btn-itsm btn-sm">
               <i class="bi bi-send me-1"></i>Comentar
             </button>
@@ -137,7 +141,8 @@
   <!-- COLUNA LATERAL -->
   <div class="col-lg-4">
 
-    <!-- Atualizar ticket -->
+    <!-- Atualizar ticket — só a equipe altera status, técnico e prioridade -->
+    {% if perfil.can_manage_tickets %}
     <div class="itsm-card mb-3" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
         <i class="bi bi-gear me-2" style="color:var(--itsm-accent);"></i>Atualizar Ticket
@@ -161,6 +166,7 @@
         </button>
       </form>
     </div>
+    {% endif %}
 
     <!-- Informações -->
     <div class="itsm-card" style="padding:1.25rem;">
