@@ -33,6 +33,22 @@
 - [x] Avisar o usuário quando um anexo é rejeitado — antes era descartado em silêncio
 - [x] `db.sqlite3` e `media/` fora do git (`.gitignore` + `git rm --cached`)
 - [x] Trocar `except Exception: pass` por `logger.exception` em `tickets/views.py`
+- [x] `fail_silently=False` + `logger` em `notifications/email.py` (o Django engolia erros de SMTP)
+- [x] CSS inline do `base.html` → `static/css/itsm.css` (333 → 157 linhas no template)
+- [x] Contadores de SLA viraram consulta no banco (`dashboard` e `reports`)
+- [x] Imports duplicados do `reports/views.py`
+- [x] Renomear "ITSM PRO" → "ITSM Enterprise" em 11 templates (12 ocorrências)
+- [x] Primeira suíte de testes: 46 testes nos 6 apps (`python manage.py test`)
+
+### Pendências conhecidas (não bloqueiam a Fase 3.1)
+- Classes CSS `itsm-card` (27 usos) e `itsm-table` (7 usos) **não existem** no CSS;
+  o que existe é `.card-itsm`, `.card-header-itsm` e `.t-itsm`, definidos e nunca usados.
+  Rename feito pela metade — corrigir muda a aparência de todas as telas.
+- Variáveis CSS canônicas são sem prefixo (`--bg`, `--text`…) e os `--itsm-*` são apelidos;
+  o CLAUDE.md pede o prefixo `--itsm-`. São 83 usos sem prefixo nos templates.
+- `report_dashboard` roda uma query por dia no gráfico de volume diário (até 30 queries).
+- O JS de badges segue inline no `base.html` porque usa `{% url %}` — não dá para mover
+  para um arquivo .js sem passar as URLs por outro caminho.
 
 ### 3.1 — RBAC
 - [ ] Model `UserProfile` com perfil: solicitante, tecnico, gerente, admin

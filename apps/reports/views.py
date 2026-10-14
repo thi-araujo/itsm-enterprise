@@ -1,10 +1,7 @@
 from django.shortcuts import render
-
-# Create your views here.
-from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
 import json
@@ -72,10 +69,8 @@ def report_dashboard(request):
         resolved_at__isnull=False,
         sla_deadline__isnull=False,
     )
-    sla_ok = sum(
-        1 for t in resolved_qs
-        if t.resolved_at and t.sla_deadline and t.resolved_at <= t.sla_deadline
-    )
+    # Comparação feita no banco (F) — antes iterava todos os tickets em memória.
+    sla_ok    = resolved_qs.filter(resolved_at__lte=F('sla_deadline')).count()
     sla_total = resolved_qs.count()
     sla_pct   = round((sla_ok / sla_total * 100) if sla_total else 0, 1)
 
@@ -114,10 +109,8 @@ def report_technician(request):
         resolved = qs.filter(status__in=['resolved', 'closed'],
                              resolved_at__isnull=False,
                              sla_deadline__isnull=False)
-        sla_ok   = sum(
-            1 for t in resolved
-            if t.resolved_at and t.sla_deadline and t.resolved_at <= t.sla_deadline
-        )
+        sla_ok         = resolved.filter(resolved_at__lte=F('sla_deadline')).count()
+        com_sla        = resolved.count()
         total_resolved = qs.filter(status__in=['resolved', 'closed']).count()
         data.append({
             'tech':     tech,
@@ -126,8 +119,7 @@ def report_technician(request):
             'progress': qs.filter(status='in_progress').count(),
             'resolved': total_resolved,
             'sla_ok':   sla_ok,
-            'sla_pct':  round((sla_ok / resolved.count() * 100)
-                              if resolved.count() else 0, 1),
+            'sla_pct':  round((sla_ok / com_sla * 100) if com_sla else 0, 1),
         })
 
     data.sort(key=lambda x: x['total'], reverse=True)

@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
+from django.utils import timezone
 from apps.tickets.models import Ticket
 
 
@@ -14,7 +15,10 @@ def index(request):
         'in_progress': tickets.filter(status='in_progress').count(),
         'resolved':    tickets.filter(status='resolved').count(),
         'critical':    tickets.filter(priority='critical').count(),
-        'sla_risk':    sum(1 for t in tickets if t.is_sla_breached),
+        # Mesma regra de Ticket.is_sla_breached, porém resolvida no banco:
+        # antes isso carregava todos os tickets em memória a cada carga.
+        'sla_risk':    tickets.filter(sla_deadline__lt=timezone.now())
+                              .exclude(status__in=['resolved', 'closed']).count(),
     }
     
     recent_tickets = tickets.select_related('requester', 'assignee', 'category')[:10]
