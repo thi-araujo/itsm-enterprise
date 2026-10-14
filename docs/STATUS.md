@@ -95,11 +95,37 @@ O rename de classes tinha sido feito só no CSS: os templates escreviam `itsm-ca
 | `Paulo` | Solicitante | ❌ | ❌ | ❌ | 1 de 13 |
 | `Leandro` | Solicitante | ❌ | ❌ | ❌ | 2 de 13 |
 
-### 3.2 — Fluxo de atendimento
-- [ ] Campo **Solução** no ticket
-- [ ] Botão **Finalizar chamado** (exige solução, muda status, notifica solicitante)
-- [ ] **Escalonar** para outro técnico/membro da equipe com motivo
-- [ ] Histórico de escalonamentos (model próprio)
+### ✅ 3.2 — Fluxo de atendimento — Concluída
+- [x] Campos `solution` e `resolved_by` no `Ticket` (`resolved_at` já existia)
+      — `resolved_by` existe porque o `assignee` pode mudar depois da resolução
+      e a trilha de quem resolveu se perderia
+- [x] Botão **Finalizar chamado**: solução obrigatória (mínimo 10 caracteres),
+      status vai a **Resolvido** e não a Fechado — no ITIL quem fecha é o
+      solicitante, depois de confirmar
+- [x] A solução entra no histórico como comentário público e vai no corpo do
+      e-mail ao solicitante (antes o aviso dizia só "foi resolvido")
+- [x] Botão **Escalonar**: destino obrigatório (só quem tem papel de equipe,
+      e nunca o próprio usuário — ele sai do queryset do form) e motivo
+      obrigatório com mínimo de 10 caracteres
+- [x] Model `Escalation` com `from_user`/`to_user`/`reason`, ambos `SET_NULL`
+      para o registro de auditoria sobreviver se o usuário for apagado
+- [x] Escalonar troca o `assignee`, leva `open` → `in_progress` e notifica
+      quem recebeu, com o motivo
+- [x] Chamado resolvido ou fechado não finaliza nem escalona de novo
+      (`Ticket.is_in_attendance`, com `can_be_finished`/`can_be_escalated`)
+- [x] Histórico de escalonamento é interno: filtrado **no queryset**, como as
+      notas internas. O solicitante vê a solução (é para ele) e não vê o motivo
+- [x] Notificação `ticket_escalated` + `Escalation` no /admin/
+- [x] 27 testes novos — suíte total: **99 testes**
+
+**Migrações:** `tickets.0003_ticket_resolved_by_ticket_solution_escalation`
+e `notifications.0002_alter_notification_type` (só `choices`, sem mudança de schema).
+
+**Fluxo verificado no banco de desenvolvimento** (dentro de transação revertida,
+nada foi gravado): `tecnico1` escalona para `Thiago` → `in_progress`; solução "ok"
+recusada com aviso na tela; solução válida → `resolved` + `resolved_by`; o
+solicitante vê a solução e **não** vê o motivo do escalonamento; os botões
+desaparecem para ele e o de escalonar desaparece para a equipe após resolver.
 
 ### 3.3 a 3.8
 - [ ] Workflows de aprovação

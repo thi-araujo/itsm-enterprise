@@ -93,11 +93,21 @@ def notify_ticket_assigned(ticket):
 
 def notify_ticket_resolved(ticket):
     subject = f"[ITSM Enterprise] Ticket #{ticket.pk:04d} resolvido"
+    # A solução vai no corpo do e-mail: avisar "foi resolvido" sem dizer o que
+    # foi feito obriga o solicitante a abrir o sistema só para descobrir.
+    atendente = ticket.resolved_by or ticket.assignee
     body = (
         f"Olá, {ticket.requester.get_full_name() or ticket.requester.username}!\n\n"
         f"Seu chamado foi resolvido.\n\n"
         f"  ID:     #{ticket.pk:04d}\n"
-        f"  Título: {ticket.title}\n\n"
+        f"  Título: {ticket.title}\n"
+    )
+    if atendente:
+        body += f"  Por:    {atendente.get_full_name() or atendente.username}\n"
+    if ticket.solution:
+        body += f"\nSolução aplicada:\n{ticket.solution}\n"
+    body += (
+        f"\nSe o problema persistir, comente no chamado.\n\n"
         f"Acesse para confirmar: http://localhost:8000/tickets/{ticket.pk}/\n\n"
         f"— ITSM Enterprise"
     )
@@ -106,6 +116,36 @@ def notify_ticket_resolved(ticket):
     _create_notification(
         ticket.requester, 'ticket_resolved',
         f"Seu ticket #{ticket.pk:04d} foi resolvido",
+        body, ticket_id=ticket.pk
+    )
+
+
+def notify_ticket_escalated(escalation):
+    """Avisa quem recebeu o chamado escalonado, com o motivo do repasse."""
+    ticket  = escalation.ticket
+    destino = escalation.to_user
+    if not destino:
+        return
+
+    origem = escalation.from_user
+    por    = f" por {origem.get_full_name() or origem.username}" if origem else ""
+    subject = f"[ITSM Enterprise] Ticket #{ticket.pk:04d} escalonado para você"
+    body = (
+        f"Olá, {destino.get_full_name() or destino.username}!\n\n"
+        f"Um chamado foi escalonado para você{por}.\n\n"
+        f"  ID:         #{ticket.pk:04d}\n"
+        f"  Título:     {ticket.title}\n"
+        f"  Prioridade: {ticket.get_priority_display()}\n"
+        f"  SLA:        {ticket.sla_deadline.strftime('%d/%m/%Y %H:%M') if ticket.sla_deadline else '—'}\n\n"
+        f"Motivo do escalonamento:\n{escalation.reason}\n\n"
+        f"Acesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
+        f"— ITSM Enterprise"
+    )
+    emails = [destino.email] if destino.email else []
+    _send_email(subject, body, emails)
+    _create_notification(
+        destino, 'ticket_escalated',
+        f"Ticket #{ticket.pk:04d} escalonado para você",
         body, ticket_id=ticket.pk
     )
 

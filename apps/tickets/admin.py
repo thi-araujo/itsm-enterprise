@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Ticket, Category, Comment, Attachment
+from .models import Ticket, Category, Comment, Attachment, Escalation
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -11,6 +11,13 @@ class TicketAdmin(admin.ModelAdmin):
     list_filter   = ['status', 'priority', 'ticket_type', 'category']
     search_fields = ['title', 'description']
     list_editable = ['status', 'assignee']
+
+@admin.register(Escalation)
+class EscalationAdmin(admin.ModelAdmin):
+    list_display  = ['ticket', 'from_user', 'to_user', 'created_at']
+    list_filter   = ['to_user', 'created_at']
+    search_fields = ['reason']
+
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):

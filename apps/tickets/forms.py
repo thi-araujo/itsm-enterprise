@@ -1,7 +1,9 @@
 from django import forms
 from django.conf import settings
+from django.contrib.auth.models import User
 
-from .models import Ticket, Comment
+from apps.accounts.models import UserProfile
+from .models import Ticket, Comment, Escalation
 
 
 class TicketForm(forms.ModelForm):
@@ -59,3 +61,78 @@ class CommentForm(forms.ModelForm):
             }),
             'is_internal': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+
+class TicketFinishForm(forms.ModelForm):
+    """Finalizar o chamado: a solução é obrigatória.
+
+    No model `solution` é `blank=True` porque os chamados que já existiam
+    nasceram sem solução e o banco precisa aceitá-los. Aqui, no formulário,
+    ela é exigida — é a diferença entre "o banco permite" e "o usuário pode
+    deixar em branco".
+    """
+
+    class Meta:
+        model  = Ticket
+        fields = ['solution']
+        widgets = {
+            'solution': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Descreva o que foi feito para resolver o chamado...',
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['solution'].required = True
+
+    def clean_solution(self):
+        solution = self.cleaned_data['solution'].strip()
+        # Sem o mínimo, "ok" passaria a valer como documentação da solução.
+        if len(solution) < 10:
+            raise forms.ValidationError(
+                'Descreva a solução com pelo menos 10 caracteres — '
+                'ela vai para o solicitante e fica no histórico do chamado.')
+        return solution
+
+
+class EscalationForm(forms.ModelForm):
+    """Escalonar o chamado para outro membro da equipe, com motivo."""
+
+    class Meta:
+        model  = Escalation
+        fields = ['to_user', 'reason']
+        labels = {'to_user': 'Escalonar para', 'reason': 'Motivo'}
+        widgets = {
+            'to_user': forms.Select(attrs={'class': 'form-select'}),
+            'reason':  forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Por que o chamado está sendo repassado?',
+            }),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        """`user` é quem está escalonando: ele não aparece como destino.
+
+        Escalonar para si mesmo não faz sentido, e tirar a opção da lista é
+        melhor que recusar depois — o usuário nem chega a errar.
+        """
+        super().__init__(*args, **kwargs)
+        equipe = User.objects.filter(
+            profile__role__in=UserProfile.STAFF_ROLES).select_related('profile')
+        if user is not None:
+            equipe = equipe.exclude(pk=user.pk)
+        self.fields['to_user'].queryset = equipe
+        self.fields['to_user'].required = True
+        self.fields['to_user'].empty_label = 'Selecione o responsável...'
+        self.fields['reason'].required = True
+
+    def clean_reason(self):
+        reason = self.cleaned_data['reason'].strip()
+        if len(reason) < 10:
+            raise forms.ValidationError(
+                'Explique o motivo com pelo menos 10 caracteres — '
+                'quem receber o chamado precisa entender o contexto.')
+        return reason

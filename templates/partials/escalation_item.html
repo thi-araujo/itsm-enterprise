@@ -1,0 +1,20 @@
+{% comment %}
+Uma linha do histórico de escalonamento. Conteúdo interno da equipe — a view
+só manda escalonamentos para quem tem can_manage_tickets.
+{% endcomment %}
+<div style="padding:.7rem .85rem;border-radius:6px;border:1px solid rgba(245,158,11,.25);
+            background:rgba(245,158,11,.04);margin-bottom:.5rem;">
+  <div style="font-size:.78rem;margin-bottom:.35rem;">
+    <span style="color:var(--itsm-muted);">
+      {% if esc.from_user %}{{ esc.from_user.get_full_name|default:esc.from_user.username }}{% else %}Usuário removido{% endif %}
+    </span>
+    <i class="bi bi-arrow-right mx-1" style="color:var(--itsm-warning);font-size:.7rem;"></i>
+    <span style="font-weight:600;">
+      {% if esc.to_user %}{{ esc.to_user.get_full_name|default:esc.to_user.username }}{% else %}Usuário removido{% endif %}
+    </span>
+  </div>
+  <div style="font-size:.82rem;line-height:1.6;white-space:pre-wrap;">{{ esc.reason }}</div>
+  <div style="font-size:.72rem;color:var(--itsm-muted);margin-top:.35rem;">
+    <i class="bi bi-calendar3 me-1"></i>{{ esc.created_at|date:"d/m/Y H:i" }}
+  </div>
+</div>

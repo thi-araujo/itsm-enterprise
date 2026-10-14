@@ -77,6 +77,13 @@ class Ticket(models.Model):
     # SLA
     sla_deadline = models.DateTimeField(null=True, blank=True, verbose_name="Prazo SLA")
 
+    # Atendimento (Fase 3.2)
+    solution    = models.TextField(blank=True, verbose_name="Solução")
+    # Quem finalizou. Não dá para usar `assignee`: o responsável pode mudar
+    # depois da resolução e a trilha de quem resolveu se perderia.
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='resolved_tickets', verbose_name="Resolvido por")
+
     # Datas
     created_at  = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at  = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
@@ -118,6 +125,26 @@ class Ticket(models.Model):
         return colors.get(self.status, 'secondary')
 
     @property
+    def is_in_attendance(self):
+        """O chamado ainda está em atendimento (não foi resolvido nem fechado).
+
+        A regra mora aqui, como as do UserProfile: as views e os templates
+        apenas perguntam, e não repetem a lista de status.
+        """
+        return self.status not in ('resolved', 'closed')
+
+    @property
+    def can_be_finished(self):
+        """Só faz sentido finalizar um chamado que ainda está em atendimento."""
+        return self.is_in_attendance
+
+    @property
+    def can_be_escalated(self):
+        """Idem para escalonar: repassar um chamado encerrado não faz sentido
+        e reatribuiria o responsável sem ninguém esperar por isso."""
+        return self.is_in_attendance
+
+    @property
     def is_sla_breached(self):
         if self.sla_deadline and self.status not in ('resolved', 'closed'):
             return timezone.now() > self.sla_deadline
@@ -156,6 +183,37 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"Comentário de {self.author} em #{self.ticket.pk}"
+
+
+class Escalation(models.Model):
+    """Histórico de escalonamentos de um chamado (Fase 3.2).
+
+    É um model próprio, e não um comentário de texto, porque o histórico
+    precisa ser consultável — `ticket.escalations.count()`, "quantos chamados
+    foram escalonados para este técnico" — e será a base do escalonamento
+    automático por SLA vencido (Fase 3.7). Texto solto num Comment não
+    responde a essas perguntas.
+    """
+
+    ticket    = models.ForeignKey(Ticket, on_delete=models.CASCADE,
+                                  related_name='escalations', verbose_name="Ticket")
+    # from_user e to_user são SET_NULL: se o técnico sair da empresa e o
+    # usuário for apagado, o registro de auditoria tem de sobreviver.
+    from_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='escalations_sent', verbose_name="Escalonado por")
+    to_user   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='escalations_received', verbose_name="Escalonado para")
+    reason    = models.TextField(verbose_name="Motivo")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Data")
+
+    class Meta:
+        verbose_name = "Escalonamento"
+        verbose_name_plural = "Escalonamentos"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        destino = self.to_user.username if self.to_user else "—"
+        return f"#{self.ticket_id} escalonado para {destino}"
 
 
 class Attachment(models.Model):

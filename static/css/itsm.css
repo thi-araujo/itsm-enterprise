@@ -147,6 +147,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Sora', sans-seri
 .btn-outline-itsm { border: 1px solid var(--border); color: var(--muted); background: transparent; font-size: .82rem; border-radius: 6px; }
 .btn-outline-itsm:hover { border-color: var(--accent); color: var(--text); background: rgba(59,130,246,.07); }
 
+/* O <summary> dos blocos "Finalizar/Escalonar" é estilizado como botão:
+   o triângulo nativo do <details> estragaria o alinhamento. */
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::marker { content: ''; }
+
 /* ── Ticket ID ── */
 .ticket-id { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: .78rem; font-weight: 600; }
 

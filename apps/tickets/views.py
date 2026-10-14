@@ -10,8 +10,9 @@ import os
 
 from apps.accounts.models import UserProfile
 from apps.accounts.permissions import staff_required
-from .models import Ticket, Comment, Category, Attachment
-from .forms import TicketForm, TicketUpdateForm, CommentForm
+from .models import Ticket, Comment, Category, Attachment, Escalation
+from .forms import (TicketForm, TicketUpdateForm, CommentForm,
+                    TicketFinishForm, EscalationForm)
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +101,28 @@ def ticket_detail(request, pk):
     if not perfil.can_see_internal_notes:
         comments = comments.filter(is_internal=False)
 
+    # O histórico de escalonamento é informação interna da equipe, e segue a
+    # mesma regra das notas internas: fica fora do queryset do solicitante,
+    # não escondido no template.
+    if perfil.can_manage_tickets:
+        escalations = ticket.escalations.select_related('from_user', 'to_user')
+        finish_form = TicketFinishForm(instance=ticket)
+        escalate_form = EscalationForm(user=request.user)
+    else:
+        escalations = ticket.escalations.none()
+        finish_form = None
+        escalate_form = None
+
     context = {
-        'ticket':       ticket,
-        'comment_form': comment_form,
-        'update_form':  update_form,
-        'comments':     comments,
-        'attachments':  attachments,
-        'perfil':       perfil,
+        'ticket':        ticket,
+        'comment_form':  comment_form,
+        'update_form':   update_form,
+        'finish_form':   finish_form,
+        'escalate_form': escalate_form,
+        'comments':      comments,
+        'attachments':   attachments,
+        'escalations':   escalations,
+        'perfil':        perfil,
         **_politica_de_upload(),
     }
     return render(request, 'tickets/detail.html', context)
@@ -170,6 +186,99 @@ def ticket_update_status(request, pk):
             except Exception:
                 logger.exception('Falha ao notificar atualização do ticket #%s', pk)
             messages.success(request, 'Ticket atualizado!')
+    return redirect('tickets:detail', pk=pk)
+
+
+@login_required
+@staff_required
+def ticket_finish(request, pk):
+    """Finaliza o chamado exigindo a solução (Fase 3.2).
+
+    Leva a "Resolvido", não a "Fechado": no ITIL quem fecha é o solicitante,
+    depois de confirmar. "Resolvido" significa "o técnico terminou, aguardando
+    confirmação".
+    """
+    ticket = get_object_or_404(Ticket, pk=pk)
+
+    if request.method != 'POST':
+        return redirect('tickets:detail', pk=pk)
+
+    if not ticket.can_be_finished:
+        messages.error(request, 'Este chamado já está resolvido ou fechado.')
+        return redirect('tickets:detail', pk=pk)
+
+    form = TicketFinishForm(request.POST, instance=ticket)
+    if not form.is_valid():
+        # Mostra o erro de validação do form (solução vazia ou curta demais).
+        for erro in form.errors.get('solution', ['Informe a solução.']):
+            messages.error(request, erro)
+        return redirect('tickets:detail', pk=pk)
+
+    ticket = form.save(commit=False)
+    ticket.status      = 'resolved'
+    ticket.resolved_by = request.user
+    # resolved_at é preenchido pelo save() do model quando o status vira
+    # 'resolved' — não repetir aqui.
+    ticket.save()
+
+    # A solução também entra no histórico como comentário público, para o
+    # solicitante ler na mesma linha do tempo dos outros comentários.
+    Comment.objects.create(
+        ticket=ticket, author=request.user, is_internal=False,
+        content=f"Chamado finalizado.\n\nSolução: {ticket.solution}",
+    )
+
+    try:
+        from apps.notifications.email import notify_ticket_resolved
+        notify_ticket_resolved(ticket)
+    except Exception:
+        logger.exception('Falha ao notificar resolução do ticket #%s', pk)
+
+    messages.success(request, f'Chamado #{ticket.pk:04d} finalizado com sucesso!')
+    return redirect('tickets:detail', pk=pk)
+
+
+@login_required
+@staff_required
+def ticket_escalate(request, pk):
+    """Repassa o chamado a outro membro da equipe, com motivo registrado."""
+    ticket = get_object_or_404(Ticket, pk=pk)
+
+    if request.method != 'POST':
+        return redirect('tickets:detail', pk=pk)
+
+    if not ticket.can_be_escalated:
+        messages.error(request, 'Chamado resolvido ou fechado não pode ser escalonado.')
+        return redirect('tickets:detail', pk=pk)
+
+    # `user=request.user` tira o próprio usuário da lista de destinos: um POST
+    # forjado escalonando para si mesmo cai como destino inválido.
+    form = EscalationForm(request.POST, user=request.user)
+    if not form.is_valid():
+        for campo, erros in form.errors.items():
+            for erro in erros:
+                messages.error(request, erro)
+        return redirect('tickets:detail', pk=pk)
+
+    escalation           = form.save(commit=False)
+    escalation.ticket    = ticket
+    escalation.from_user = request.user
+    escalation.save()
+
+    ticket.assignee = escalation.to_user
+    # Um chamado escalonado está em atendimento, não mais só "aberto".
+    if ticket.status == 'open':
+        ticket.status = 'in_progress'
+    ticket.save()
+
+    try:
+        from apps.notifications.email import notify_ticket_escalated
+        notify_ticket_escalated(escalation)
+    except Exception:
+        logger.exception('Falha ao notificar escalonamento do ticket #%s', pk)
+
+    destino = escalation.to_user.get_full_name() or escalation.to_user.username
+    messages.success(request, f'Chamado escalonado para {destino}.')
     return redirect('tickets:detail', pk=pk)
 
 

@@ -42,6 +42,25 @@
       </div>
     </div>
 
+    <!-- Solução — aparece só depois de finalizado; o solicitante também vê -->
+    {% if ticket.solution %}
+    <div class="itsm-card mb-3" id="solution-card" style="padding:1.5rem;border-color:rgba(16,185,129,.35);">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:.85rem;">
+        <i class="bi bi-check-circle me-2" style="color:var(--itsm-success);"></i>Solução
+      </div>
+      <div style="background:rgba(16,185,129,.05);border-radius:6px;padding:1rem;">
+        <p style="margin:0;font-size:.9rem;line-height:1.75;white-space:pre-wrap;">{{ ticket.solution }}</p>
+      </div>
+      <div style="font-size:.8rem;color:var(--itsm-muted);margin-top:.85rem;">
+        {% if ticket.resolved_by %}
+        <i class="bi bi-person-check me-1"></i>{{ ticket.resolved_by.get_full_name|default:ticket.resolved_by.username }}
+        &nbsp;&bull;&nbsp;
+        {% endif %}
+        <i class="bi bi-calendar3 me-1"></i>{{ ticket.resolved_at|date:"d/m/Y H:i"|default:"—" }}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Anexos -->
     <div class="itsm-card mb-3">
       <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--itsm-border);display:flex;justify-content:space-between;align-items:center;">
@@ -166,6 +185,77 @@
         </button>
       </form>
     </div>
+
+    <!-- Atendimento — finalizar e escalonar (Fase 3.2) -->
+    <div class="itsm-card mb-3" style="padding:1.25rem;">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
+        <i class="bi bi-clipboard-check me-2" style="color:var(--itsm-accent);"></i>Atendimento
+      </div>
+
+      {% if ticket.can_be_finished %}
+      <details class="mb-2">
+        <summary class="btn btn-itsm btn-sm w-100" style="cursor:pointer;list-style:none;">
+          <i class="bi bi-check2-circle me-1"></i>Finalizar chamado
+        </summary>
+        <form method="POST" action="{% url 'tickets:finish' ticket.pk %}" class="mt-2">
+          {% csrf_token %}
+          <label class="form-label" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+            Solução aplicada
+          </label>
+          {{ finish_form.solution }}
+          <div style="font-size:.72rem;color:var(--itsm-muted);margin:.4rem 0 .6rem;">
+            Obrigatória, mínimo 10 caracteres. O texto vai por e-mail ao solicitante.
+          </div>
+          <button type="submit" class="btn btn-itsm btn-sm w-100">
+            <i class="bi bi-send-check me-1"></i>Confirmar e resolver
+          </button>
+        </form>
+      </details>
+      {% else %}
+      <div style="font-size:.8rem;color:var(--itsm-muted);margin-bottom:.75rem;">
+        <i class="bi bi-check-circle me-1" style="color:var(--itsm-success);"></i>
+        Chamado já {{ ticket.get_status_display|lower }}.
+      </div>
+      {% endif %}
+
+      {% if ticket.can_be_escalated %}
+      <details>
+        <summary class="btn btn-outline-itsm btn-sm w-100" style="cursor:pointer;list-style:none;">
+          <i class="bi bi-arrow-up-right-circle me-1"></i>Escalonar
+        </summary>
+        <form method="POST" action="{% url 'tickets:escalate' ticket.pk %}" class="mt-2">
+          {% csrf_token %}
+          <label class="form-label" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+            Escalonar para
+          </label>
+          {{ escalate_form.to_user }}
+          <label class="form-label mt-2" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+            Motivo
+          </label>
+          {{ escalate_form.reason }}
+          <div style="font-size:.72rem;color:var(--itsm-muted);margin:.4rem 0 .6rem;">
+            Obrigatório, mínimo 10 caracteres. Fica no histórico do chamado.
+          </div>
+          <button type="submit" class="btn btn-outline-itsm btn-sm w-100">
+            <i class="bi bi-arrow-up-right me-1"></i>Repassar chamado
+          </button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- Histórico de escalonamentos — interno, filtrado na view -->
+    {% if escalations %}
+    <div class="itsm-card mb-3" style="padding:1.25rem;">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
+        <i class="bi bi-diagram-2 me-2" style="color:var(--itsm-warning);"></i>
+        Escalonamentos <span style="color:var(--itsm-muted);font-weight:400;">({{ escalations.count }})</span>
+      </div>
+      {% for esc in escalations %}
+        {% include 'partials/escalation_item.html' with esc=esc %}
+      {% endfor %}
+    </div>
+    {% endif %}
     {% endif %}
 
     <!-- Informações -->
