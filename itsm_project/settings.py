@@ -115,4 +115,4 @@ LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # E-mail: em desenvolvimento, as mensagens aparecem no console.
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'itsm-enterprise@local'
+DEFAULT_FROM_EMAIL = 'itsm-enterprise@exemplo.local'

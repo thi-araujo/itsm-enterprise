@@ -23,9 +23,12 @@
 ### 3.0 — Refatoração (fazer primeiro)
 - [x] Recriar `itsm_project/` (settings.py, urls.py, wsgi.py) — pasta estava ausente do projeto e do git
 - [x] Criar comando de management `check_sla` (faltava, embora já citado aqui como concluído)
-- [x] Remover "RAVEN" de todo o projeto → "ITSM Enterprise"
-- [ ] Mover apps para `apps/` mantendo labels
-- [ ] Badges da sidebar (notificações não lidas, tickets sem técnico)
+- [x] Remover o nome antigo do sistema de todo o código-fonte → "ITSM Enterprise"
+      (inclui limpeza do `db.sqlite3`: 2 e-mails de usuário e 18 notificações antigas)
+- [x] Mover apps para `apps/` mantendo labels (`name='apps.<app>'` + `label='<app>'` nos 6 apps)
+- [x] Badges da sidebar (notificações não lidas, tickets sem técnico)
+- [x] Mover `CLAUDE.md`, `docs/` e `.claude/` para a raiz — estavam em `itsm_enterprise_kit/`,
+      então o Claude Code não lia as regras nem os slash commands
 
 ### 3.1 — RBAC
 - [ ] Model `UserProfile` com perfil: solicitante, tecnico, gerente, admin

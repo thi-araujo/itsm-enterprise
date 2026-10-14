@@ -11,12 +11,12 @@ from apps.tickets.models import Category, Ticket
 
 # Superuser
 if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@itsm.local', 'admin')
+    User.objects.create_superuser('admin', 'admin@exemplo.local', 'admin')
     print("Superuser admin criado (senha: admin)")
 
 # Técnico
 if not User.objects.filter(username='thiago').exists():
-    u = User.objects.create_user('thiago', 'thiago@itsm.local', 'thiago123')
+    u = User.objects.create_user('thiago', 'thiago@exemplo.local', 'thiago123')
     u.first_name = 'Thiago'
     u.last_name = 'Analista'
     u.save()
