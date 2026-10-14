@@ -438,6 +438,19 @@ def _conexao_falsa():
             f'CN=Suporte\\, Nível 2,OU=Grupos,{BASE}',
         ],
     })
+    # Conta sem `givenName`/`sn`, como as criadas à mão no AD: o nome existe
+    # só no CN do DN.
+    conexao.strategy.add_entry(f'CN=Maria Clara dos Santos,OU=Usuarios,{BASE}', {
+        'objectClass':    ['top', 'person', 'user'],
+        'sAMAccountName': 'maria.santos',
+        'memberOf':       [f'CN=ITSM-Gerentes,OU=Grupos,{BASE}'],
+    })
+    # Conta com `displayName` mas sem `givenName`/`sn`.
+    conexao.strategy.add_entry(f'CN=jpaulo,OU=Usuarios,{BASE}', {
+        'objectClass':    ['top', 'person', 'user'],
+        'sAMAccountName': 'joao.paulo',
+        'displayName':    'João Paulo Souza',
+    })
     conexao.bind()
     return conexao
 
@@ -482,6 +495,25 @@ class ClienteLdapComServidorFalsoTests(TestCase):
         dados = autenticar('joao', 'senha')
         self.assertIn('Suporte, Nível 2', dados.groups)
 
+    def test_nome_vem_do_display_name_quando_falta_given_name(self):
+        """Conta de AD montada à mão costuma não ter `givenName`/`sn`. Sem a
+        queda para trás, o ITSM mostraria `joao.paulo` em todas as telas."""
+        dados = autenticar('joao.paulo', 'senha')
+        self.assertEqual(dados.first_name, 'João')
+        self.assertEqual(dados.last_name, 'Paulo Souza')
+
+    def test_nome_vem_do_cn_quando_nem_display_name_existe(self):
+        dados = autenticar('maria.santos', 'senha')
+        self.assertEqual(dados.first_name, 'Maria')
+        self.assertEqual(dados.last_name, 'Clara dos Santos')
+
+    def test_given_name_preenchido_tem_precedencia(self):
+        """Quem tem os campos certos no AD não passa pela queda para trás —
+        senão o CN (`Joao Silva`, sem acento) venceria o `givenName`."""
+        dados = autenticar('joao', 'senha')
+        self.assertEqual(dados.first_name, 'João')
+        self.assertEqual(dados.last_name, 'Silva')
+
     def test_conta_fora_da_base_de_busca_nao_e_encontrada(self):
         """Bind aceito e busca vazia não é "senha errada" — é configuração
         errada. De qualquer forma o login não passa."""
@@ -495,6 +527,28 @@ class ClienteLdapComServidorFalsoTests(TestCase):
 
     def test_parenteses_no_username_nao_quebram_o_filtro(self):
         self.assertIsNone(autenticar('jo)ao', 'senha'))
+
+
+class DivisaoDoNomeTests(TestCase):
+    """`_dividir_nome` — o Django tem dois campos, o AD costuma ter um."""
+
+    def test_nome_e_sobrenome(self):
+        from .ldap_client import _dividir_nome
+        self.assertEqual(_dividir_nome('Thiago Araujo'), ('Thiago', 'Araujo'))
+
+    def test_nome_composto_mantem_o_sobrenome_inteiro(self):
+        from .ldap_client import _dividir_nome
+        self.assertEqual(_dividir_nome('Maria Clara dos Santos'),
+                         ('Maria', 'Clara dos Santos'))
+
+    def test_nome_de_uma_palavra_nao_inventa_sobrenome(self):
+        from .ldap_client import _dividir_nome
+        self.assertEqual(_dividir_nome('Thiago'), ('Thiago', ''))
+
+    def test_vazio_nao_quebra(self):
+        from .ldap_client import _dividir_nome
+        self.assertEqual(_dividir_nome(''), ('', ''))
+        self.assertEqual(_dividir_nome('   '), ('', ''))
 
 
 class MontagemDoUpnTests(TestCase):

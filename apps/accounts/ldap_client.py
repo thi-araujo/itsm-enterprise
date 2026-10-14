@@ -101,19 +101,35 @@ def _desescapar_rdn(valor):
     return saida.decode('utf-8', errors='replace')
 
 
-def _nome_do_grupo(dn):
-    """Extrai o nome do grupo do DN completo.
+def _primeiro_rdn(dn):
+    """Extrai o primeiro componente do DN — na prática, o CN.
 
-    De `CN=ITSM-Tecnicos,OU=Grupos,DC=exemplo,DC=local` sai `ITSM-Tecnicos`.
-    Usa o parser do próprio `ldap3` em vez de `split(',')` porque um nome de
-    grupo pode conter vírgula escapada, e o split cortaria o nome no meio.
+    De `CN=ITSM-Tecnicos,OU=Grupos,DC=exemplo,DC=local` sai `ITSM-Tecnicos`, e de
+    `CN=Thiago Araujo,OU=Usuarios,...` sai `Thiago Araujo`. Serve para os dois:
+    o nome do grupo e o nome da pessoa.
+
+    Usa o parser do próprio `ldap3` em vez de `split(',')` porque o valor pode
+    conter vírgula escapada, e o split cortaria o nome no meio.
     """
     from ldap3.utils.dn import parse_dn
     try:
         return _desescapar_rdn(parse_dn(str(dn))[0][1])
     except Exception:
-        logger.warning('LDAP: não consegui ler o nome do grupo em %r', dn)
+        logger.warning('LDAP: não consegui ler o CN em %r', dn)
         return str(dn)
+
+
+def _dividir_nome(nome_completo):
+    """`Thiago Araujo` → `('Thiago', 'Araujo')`.
+
+    Corta no **primeiro** espaço: o Django tem dois campos, e nomes compostos
+    ("Maria Clara dos Santos") têm o sobrenome na parte maior. Nome de uma só
+    palavra vira só o primeiro nome.
+    """
+    partes = (nome_completo or '').split()
+    if not partes:
+        return '', ''
+    return partes[0], ' '.join(partes[1:])
 
 
 def _primeiro(entrada, atributo):
@@ -304,14 +320,24 @@ def autenticar(username, password):
                            username, settings.LDAP_SEARCH_BASE)
             return None
 
-        grupos = [_nome_do_grupo(g) for g in (entrada.get('memberOf') or [])]
+        grupos = [_primeiro_rdn(g) for g in (entrada.get('memberOf') or [])]
         if settings.LDAP_NESTED_GROUPS and dn:
             grupos = _grupos_aninhados(leitura, dn)
 
+        first_name = _primeiro(entrada, 'givenName')
+        last_name  = _primeiro(entrada, 'sn')
+        if not first_name and not last_name:
+            # Conta sem `givenName`/`sn` preenchidos é comum em AD montado à
+            # mão: o nome existe só no `displayName`, ou apenas no CN do DN.
+            # Sem esta queda para trás, o ITSM mostraria `joao.silva` em
+            # todas as telas em vez de "Thiago Araujo".
+            first_name, last_name = _dividir_nome(
+                _primeiro(entrada, 'displayName') or _primeiro_rdn(dn))
+
         return UsuarioLdap(
             username=_primeiro(entrada, 'sAMAccountName') or username,
-            first_name=_primeiro(entrada, 'givenName'),
-            last_name=_primeiro(entrada, 'sn'),
+            first_name=first_name,
+            last_name=last_name,
             email=_primeiro(entrada, 'mail'),
             department=_primeiro(entrada, 'department'),
             groups=grupos,

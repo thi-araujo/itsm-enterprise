@@ -230,15 +230,19 @@ LDAP_USER_FILTER = '(&(objectClass=user)(sAMAccountName={username}))'
 # Grupo do AD → papel do ITSM. Lista **ordenada**: o primeiro que casar vence,
 # então o papel mais privilegiado vem primeiro.
 #
-# Os nomes abaixo são um palpite. Descubra os seus com
-# `python manage.py ldap_check --user <seu-usuario>`, que imprime os grupos
-# reais da conta, e ajuste esta lista.
+# Nomes conferidos no domínio exemplo.local em 14/10/2026 com
+# `manage.py ldap_check --user joao.silva`. Para ver os grupos de outra
+# conta, rode o mesmo comando com ela.
 LDAP_GROUP_ROLE_MAP = [
-    ('ITSM-Admins',    'admin'),
+    ('GRP-Admins',     'admin'),
     ('Domain Admins',  'admin'),
-    ('ITSM-Gerentes',  'manager'),
-    ('ITSM-Tecnicos',  'technician'),
+    ('GRP-Managers',   'manager'),     # ainda não existe no AD — criar
+    ('GRP-Technical',  'technician'),
 ]
+# Os demais grupos do domínio (GRP-Geral, GRP-Arquivos, GRP-Documentos,
+# GRP-Cofre) ficaram fora de propósito: não são papéis de atendimento, e
+# qualquer grupo não listado aqui simplesmente não concede privilégio —
+# a pessoa entra como LDAP_DEFAULT_ROLE.
 
 # Papel de quem autentica no AD mas não está em nenhum grupo do mapa.
 # Solicitante é o menor privilégio.

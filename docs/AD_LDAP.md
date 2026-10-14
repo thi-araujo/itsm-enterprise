@@ -43,6 +43,7 @@ controlador de domínio cair não pode trancar ninguém fora do sistema.
 | DNS de `exemplo.local` | resolve para `192.168.10.4` |
 | Controlador de domínio | `dc01.exemplo.local` = `192.168.10.4` (registro SRV) |
 | LDAP na porta 389 | ✅ responde, e a base `DC=exemplo,DC=local` confere |
+| Bind de `joao.silva` | ✅ aceito; 7 grupos lidos; papel resolvido como Administrador |
 | LDAPS na porta 636 | ❌ a conexão TCP abre e o TLS é derrubado |
 | StartTLS na 389 | ❌ o servidor responde `unavailable` |
 
@@ -130,13 +131,30 @@ Em `itsm_project/settings.py`:
 
 ```python
 LDAP_GROUP_ROLE_MAP = [
-    ('ITSM-Admins',    'admin'),
+    ('GRP-Admins',     'admin'),
     ('Domain Admins',  'admin'),
-    ('ITSM-Gerentes',  'manager'),
-    ('ITSM-Tecnicos',  'technician'),
+    ('GRP-Managers',   'manager'),     # ainda não existe no AD — criar
+    ('GRP-Technical',  'technician'),
 ]
 LDAP_DEFAULT_ROLE = 'requester'
 ```
+
+Estes são os nomes **reais** do domínio `exemplo.local`, conferidos em
+14/10/2026. Os outros grupos que existem lá (`GRP-Geral`, `GRP-Arquivos`,
+`GRP-Documentos`, `GRP-Cofre`) ficaram de fora de propósito: não são papéis de
+atendimento. Grupo não listado simplesmente não concede privilégio — quem está
+só neles entra como Solicitante.
+
+**`GRP-Managers` ainda não existe no AD.** A entrada está no mapa para o dia em
+que o grupo for criado; até lá ninguém recebe o papel de Gerente pelo AD (dá
+para definir pelo `/admin/`, que o próximo login não sobrescreve, porque sem
+grupo casando o papel atual é mantido).
+
+**`Domain Admins` → `admin` merece decisão sua.** É conveniente e foi o que
+resolveu o papel na primeira prova, mas acopla a administração do ITSM à
+administração do domínio: quem for adicionado a `Domain Admins` por um motivo
+de infraestrutura ganha o ITSM inteiro de brinde. Se preferir desacoplar,
+remova a linha e use só `GRP-Admins`.
 
 É uma **lista ordenada**, não um dicionário: o primeiro grupo que casar vence,
 então o papel mais privilegiado vem primeiro. Quem está em `ITSM-Admins` e em
@@ -224,6 +242,7 @@ custo de uma consulta a mais por login.
 | Caixa do username | busca `iexact`: o AD devolvendo `Thiago` acha o `thiago` existente |
 | Conta inativa no ITSM | não entra, mesmo com a senha certa no AD |
 | Campo vazio no AD | não apaga o valor que já estava preenchido |
+| Conta sem `givenName`/`sn` | o nome vem do `displayName` ou do CN do DN |
 
 Duas decisões que merecem explicação:
 
@@ -231,6 +250,12 @@ Duas decisões que merecem explicação:
 `db.sqlite3`, e trocar ou bloquear a senha no domínio não revogaria o acesso ao
 ITSM. Como efeito colateral, a conta do AD **não** consegue entrar quando o
 LDAP está desligado — ela não tem senha local para conferir.
+
+**O nome tem queda para trás.** Conta de AD montada à mão costuma não ter
+`givenName` e `sn` preenchidos — o nome existe só no `displayName`, ou apenas no
+CN do DN (`CN=Thiago Araujo,OU=Usuarios,...`). Nesse caso o nome é lido de lá e
+cortado no primeiro espaço. Sem isso o ITSM mostraria `joao.silva` em toda
+tela, em vez de "Thiago Araujo".
 
 **Usuário que já existia não é rebaixado.** Se alguém não casa com nenhum grupo
 do mapa, o papel atual é mantido. Sem essa regra, o `thiago` (Administrador
@@ -257,6 +282,20 @@ em qualquer lugar, e o backend de autenticação são ~120 linhas. De quebra, o
 mapeamento de grupo para papel fica explícito em código em vez de escondido
 numa configuração.
 
+## Atributos que valem preencher no AD
+
+O `ldap_check --user` avisa quando a conta está sem eles:
+
+- **`mail` vazio → a pessoa não recebe as notificações por e-mail do ITSM.**
+  O sistema manda e-mail em abertura, comentário, resolução e vencimento de
+  SLA; sem endereço, essas mensagens não têm para onde ir. As notificações
+  internas (o sino na barra) continuam funcionando, porque não dependem de
+  e-mail.
+- **`department` vazio** → o campo fica em branco no perfil. É também o dado
+  de que a aprovação por departamento vai depender.
+- **`givenName` / `sn` vazios** → funciona, pela queda para trás descrita
+  acima, mas preencher no AD é melhor que depender do CN.
+
 ## Limitações conhecidas
 
 - **Não há SSO.** Entrar sem digitar a senha (Kerberos/SPNEGO) exigiria
@@ -274,7 +313,7 @@ numa configuração.
 
 ## Testes
 
-48 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
+55 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
 estratégias:
 
 1. A maioria substitui `ldap_backend.autenticar` por uma função falsa e

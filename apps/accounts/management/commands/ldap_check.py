@@ -195,6 +195,18 @@ class Command(BaseCommand):
         self._item('Departamento', dados.department or '(vazio)')
         self._item('DN', dados.dn or '(vazio)')
 
+        if not dados.email:
+            # Consequência concreta, não só um campo em branco: o ITSM manda
+            # e-mail em abertura, comentário, resolução e vencimento de SLA.
+            self._aviso('a conta não tem `mail` no AD — esta pessoa não vai '
+                        'receber\n          as notificações por e-mail do '
+                        'ITSM (as internas, no sino, funcionam).\n'
+                        '          Preencha o campo E-mail nas propriedades '
+                        'do usuário no AD.')
+        if not dados.department:
+            self._aviso('a conta não tem `department` no AD — o campo fica '
+                        'vazio no perfil do ITSM.')
+
         self._titulo(f'Grupos ({len(dados.groups)})')
         if not dados.groups:
             self._aviso('nenhum grupo retornado. Se a sua estrutura usa grupos '

@@ -413,7 +413,13 @@ total 1 contra 13 da equipe.
       exemplo.local" quando o AD está ligado
 - [x] Tudo por variável de ambiente (`ITSM_LDAP_*`) e **desligado por padrão**:
       a suíte não toca a rede e quem clonar o projeto não trava no login
-- [x] 48 testes novos — suíte total: **341 testes**
+- [x] Nome com queda para trás: conta sem `givenName`/`sn` (comum em AD
+      montado à mão) tem o nome lido do `displayName` ou do CN do DN — senão o
+      ITSM mostraria `joao.silva` em toda tela em vez de "Thiago Araujo"
+- [x] `ldap_check --user` avisa quando a conta não tem `mail` no AD: o ITSM
+      manda e-mail em abertura, comentário, resolução e vencimento de SLA, e
+      sem endereço essas mensagens não têm para onde ir
+- [x] 55 testes novos — suíte total: **348 testes**
 
 **Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
 
@@ -422,7 +428,10 @@ total 1 contra 13 da equipe.
 **Levantamento real do domínio** (14/10/2026): `exemplo.local` resolve para
 `192.168.10.4`; o DC é `dc01.exemplo.local` pelo registro SRV; **LDAP na 389
 responde** e a base `DC=exemplo,DC=local` foi confirmada pelos naming contexts
-do servidor.
+do servidor. **Bind real validado** com `joao.silva` na 389: 7 grupos
+lidos, papel resolvido como Administrador. O `LDAP_GROUP_ROLE_MAP` foi
+atualizado com os nomes reais (`GRP-Admins`, `Domain Admins`, `GRP-Technical`);
+`GRP-Managers` está no mapa mas **ainda não existe no AD**.
 
 > ⚠️ **O DC não tem certificado de servidor instalado.** A 636 abre a conexão
 > TCP e derruba o TLS (`WinError 10054`); o StartTLS na 389 responde
