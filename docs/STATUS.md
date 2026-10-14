@@ -127,8 +127,55 @@ recusada com aviso na tela; solução válida → `resolved` + `resolved_by`; o
 solicitante vê a solução e **não** vê o motivo do escalonamento; os botões
 desaparecem para ele e o de escalonar desaparece para a equipe após resolver.
 
-### 3.3 a 3.8
-- [ ] Workflows de aprovação
+### ✅ 3.3 — Workflows de aprovação — Concluída
+- [x] `Category.requires_approval` — o gatilho fica na **categoria**, não no tipo
+      do chamado, para a política ser um checkbox no /admin/ em vez de um deploy
+- [x] Dois status novos: **Aguardando Aprovação** e **Rejeitado**, ambos fora do
+      `<select>` do painel de gestão (`Ticket.WORKFLOW_STATUSES`) — são estados
+      do workflow, não escolha do técnico. O Django valida contra as `choices`,
+      então um POST forjado com eles também é recusado
+- [x] **O SLA só começa a contar na aprovação** (`Ticket.start_sla`). Antes, um
+      chamado crítico (SLA 2h) parado no fim de semana esperando o gerente
+      nasceria já vencido, e o `check_sla` alertaria sobre um chamado que
+      ninguém podia atender
+- [x] Model `Approval` com `decided_by`/`decision`/`comment` (FK e `SET_NULL`,
+      mesmo padrão da `Escalation`)
+- [x] Fila de aprovação em `/tickets/aprovacoes/`, mais antigo primeiro, com
+      badge de contagem na sidebar
+- [x] Aprovar → status `open` + SLA iniciado + chamado entra na fila.
+      Rejeitar → status `rejected` (terminal), motivo obrigatório (mín. 10 car.)
+- [x] O parecer **o solicitante vê** — ao contrário do motivo de escalonamento,
+      que é interno: ele precisa saber por que o pedido foi negado
+- [x] O chamado pendente **não aparece** na fila dos técnicos nem no badge de
+      "sem técnico", e o painel de gestão fica escondido até a aprovação
+- [x] Notificações `approval_requested` (só para gerentes e admins, pois antes
+      da decisão não há nada que um técnico faça) e `approval_decided`
+- [x] Usuário `gerente1` criado para testar o perfil Gerente, e incluído no
+      `seed_data.py` junto com a flag de aprovação da categoria de acesso
+- [x] Badge do polling da sidebar passou a respeitar o perfil: antes o
+      solicitante consultava o contador da fila a cada 60s e tomava um
+      redirect silencioso
+- [x] 34 testes novos — suíte total: **133 testes**
+
+**Migrações:** `tickets.0004` (campo + status + model `Approval`),
+`tickets.0005_categoria_acesso_exige_aprovacao` (dados, reversível) e
+`notifications.0003_alter_notification_type` (só `choices`).
+
+**Fluxo verificado no banco de desenvolvimento** (transação revertida, nada
+gravado): chamado crítico em "Acesso e Permissões" nasce `pending_approval`
+com `sla_deadline` nulo e fora da fila; técnico tentando aprovar leva 302;
+`gerente1` vê na fila de aprovação; rejeitar sem motivo é recusado; aprovar
+inicia o SLA em exatamente 2h e libera para a fila; `Paulo` vê o parecer e
+não vê os botões; decidir duas vezes é recusado; categoria normal segue
+nascendo `open` com SLA na abertura.
+
+### Pendência desta fase
+- Qualquer gerente/admin aprova qualquer chamado. O refinamento natural é a
+  aprovação pelo gerente **do departamento** do solicitante — o campo
+  `UserProfile.department` existe mas está preenchido só para `tecnico1` e
+  `gerente1`.
+
+### 3.4 a 3.8
 - [ ] API REST (DRF)
 - [ ] Auditoria
 - [ ] Dashboard avançado

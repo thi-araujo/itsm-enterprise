@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Aprovações — ITSM Enterprise{% endblock %}
+{% block breadcrumb %}<i class="bi bi-hourglass-split me-2"></i> Aprovações{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 style="font-weight:700;margin-bottom:.25rem;">Aprovações Pendentes</h4>
+    <p style="color:var(--itsm-muted);font-size:.85rem;margin:0;">
+      {{ total }} chamado{{ total|pluralize }} aguardando decisão &bull;
+      o prazo de SLA só começa depois da aprovação
+    </p>
+  </div>
+</div>
+
+<div class="itsm-card">
+  <div style="overflow-x:auto;">
+    <table class="table itsm-table mb-0">
+      <thead><tr>
+        <th>ID</th><th>Título</th><th>Categoria</th><th>Prioridade</th>
+        <th>Solicitante</th><th>Aberto há</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for t in pending %}
+      <tr>
+        <td><a href="{% url 'tickets:detail' t.pk %}" class="ticket-id text-decoration-none">INC-2026-{{ t.pk|stringformat:"04d" }}</a></td>
+        <td style="max-width:280px;">
+          <a href="{% url 'tickets:detail' t.pk %}" style="color:var(--itsm-text);text-decoration:none;font-size:.875rem;">
+            {{ t.title }}
+          </a>
+        </td>
+        <td style="font-size:.8rem;color:var(--itsm-muted);">
+          {% if t.category %}<i class="bi bi-tag me-1"></i>{{ t.category.name }}{% else %}—{% endif %}
+        </td>
+        <td><span class="priority-badge badge-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+        <td style="font-size:.8rem;">{{ t.requester.get_full_name|default:t.requester.username }}</td>
+        <td style="font-size:.8rem;color:var(--itsm-muted);">{{ t.created_at|timesince }}</td>
+        <td>
+          <a href="{% url 'tickets:detail' t.pk %}" class="btn btn-itsm btn-sm">
+            <i class="bi bi-patch-check me-1"></i>Decidir
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7">
+        <div class="empty-state">
+          <i class="bi bi-check-all"></i>
+          Nenhum chamado aguardando aprovação.
+        </div>
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

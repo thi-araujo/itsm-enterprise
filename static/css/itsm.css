@@ -110,11 +110,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Sora', sans-seri
     font-family: 'JetBrains Mono', monospace; font-size: .68rem; padding: .2rem .5rem;
     border-radius: 4px; font-weight: 600; letter-spacing: .3px; display: inline-block;
 }
+.status-pending_approval { background: rgba(245,158,11,.12); color: #fbbf24; border: 1px solid rgba(245,158,11,.35); }
 .status-open        { background: rgba(59,130,246,.12);  color: #60a5fa; border: 1px solid rgba(59,130,246,.25); }
 .status-in_progress { background: rgba(6,182,212,.12);   color: #22d3ee; border: 1px solid rgba(6,182,212,.25); }
 .status-waiting     { background: rgba(245,158,11,.12);  color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
 .status-resolved    { background: rgba(16,185,129,.12);  color: #34d399; border: 1px solid rgba(16,185,129,.25); }
 .status-closed      { background: rgba(100,116,139,.12); color: #94a3b8; border: 1px solid rgba(100,116,139,.25); }
+.status-rejected    { background: rgba(239,68,68,.12);   color: #f87171; border: 1px solid rgba(239,68,68,.3); }
 
 /* ── Table ── */
 .itsm-table { color: var(--text); width: 100%; }

@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from apps.accounts.models import UserProfile
-from .models import Ticket, Comment, Escalation
+from .models import Approval, Ticket, Comment, Escalation
 
 
 class TicketForm(forms.ModelForm):
@@ -47,6 +47,16 @@ class TicketUpdateForm(forms.ModelForm):
             'assignee': forms.Select(attrs={'class': 'form-select'}),
             'priority': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # "Aguardando Aprovação" e "Rejeitado" são definidos pelo workflow de
+        # aprovação, não escolhidos à mão — saem do <select>. Como o Django
+        # valida contra as choices do campo, isso também barra um POST forjado.
+        self.fields['status'].choices = [
+            (valor, rotulo) for valor, rotulo in Ticket.STATUS_CHOICES
+            if valor not in Ticket.WORKFLOW_STATUSES
+        ]
 
 
 class CommentForm(forms.ModelForm):
@@ -136,3 +146,39 @@ class EscalationForm(forms.ModelForm):
                 'Explique o motivo com pelo menos 10 caracteres — '
                 'quem receber o chamado precisa entender o contexto.')
         return reason
+
+
+class ApprovalForm(forms.ModelForm):
+    """Parecer do gerente sobre um chamado que exige aprovação (Fase 3.3).
+
+    O parecer é opcional ao aprovar e obrigatório ao rejeitar: negar um
+    pedido sem dizer por que deixa o solicitante sem saber o que fazer.
+    """
+
+    class Meta:
+        model  = Approval
+        fields = ['comment']
+        labels = {'comment': 'Parecer'}
+        widgets = {
+            'comment': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Justifique a decisão...',
+            }),
+        }
+
+    def __init__(self, *args, decision=None, **kwargs):
+        """`decision` define se o parecer é obrigatório."""
+        super().__init__(*args, **kwargs)
+        self.decision = decision
+        if decision == Approval.DECISION_REJECTED:
+            self.fields['comment'].required = True
+            self.fields['comment'].label = 'Motivo da rejeição'
+
+    def clean_comment(self):
+        comment = self.cleaned_data['comment'].strip()
+        if self.decision == Approval.DECISION_REJECTED and len(comment) < 10:
+            raise forms.ValidationError(
+                'Explique o motivo da rejeição com pelo menos 10 caracteres — '
+                'o solicitante precisa saber por que o pedido foi negado.')
+        return comment

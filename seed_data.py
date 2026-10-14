@@ -33,15 +33,27 @@ if not User.objects.filter(username='tecnico1').exists():
     u.save()
     print("Usuário tecnico1 criado (senha: tecnico123)")
 
+# Gerente — usado para testar o workflow de aprovacao (Fase 3.3)
+if not User.objects.filter(username='gerente1').exists():
+    u = User.objects.create_user('gerente1', 'gerente1@exemplo.local', 'gerente123')
+    u.first_name = 'Gerente'
+    u.last_name = 'Um'
+    u.save()
+    u.profile.department = 'Tecnologia da Informacao'
+    u.profile.save()
+    print("Usuario gerente1 criado (senha: gerente123)")
+
 admin = User.objects.get(username='admin')
 thiago = User.objects.get(username='thiago')
 tecnico1 = User.objects.get(username='tecnico1')
+gerente1 = User.objects.get(username='gerente1')
 
 # Perfis de acesso (RBAC). O signal cria o perfil; aqui definimos o papel.
 for usuario, papel in [
     (admin,    UserProfile.ROLE_ADMIN),
     (thiago,   UserProfile.ROLE_ADMIN),
     (tecnico1, UserProfile.ROLE_TECHNICIAN),
+    (gerente1, UserProfile.ROLE_MANAGER),
 ]:
     if usuario.profile.role != papel:
         usuario.profile.role = papel
@@ -49,16 +61,18 @@ for usuario, papel in [
         print(f"Perfil de {usuario.username}: {usuario.profile.get_role_display()}")
 
 # Categorias
+# O ultimo campo liga o workflow de aprovacao (Fase 3.3).
 cats = [
-    ('Rede e Conectividade', 'bi-wifi', 'primary'),
-    ('Hardware', 'bi-cpu', 'warning'),
-    ('Software / Aplicações', 'bi-app-indicator', 'info'),
-    ('Segurança', 'bi-shield-lock', 'danger'),
-    ('Acesso e Permissões', 'bi-key', 'success'),
-    ('Impressão', 'bi-printer', 'secondary'),
+    ('Rede e Conectividade', 'bi-wifi', 'primary', False),
+    ('Hardware', 'bi-cpu', 'warning', False),
+    ('Software / Aplicações', 'bi-app-indicator', 'info', False),
+    ('Segurança', 'bi-shield-lock', 'danger', False),
+    ('Acesso e Permissões', 'bi-key', 'success', True),
+    ('Impressão', 'bi-printer', 'secondary', False),
 ]
-for name, icon, color in cats:
-    Category.objects.get_or_create(name=name, defaults={'icon': icon, 'color': color})
+for name, icon, color, aprovacao in cats:
+    Category.objects.get_or_create(name=name, defaults={
+        'icon': icon, 'color': color, 'requires_approval': aprovacao})
 print(f"{Category.objects.count()} categorias criadas")
 
 # Tickets de exemplo

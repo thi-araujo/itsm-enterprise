@@ -7,6 +7,57 @@
 {% endblock %}
 
 {% block content %}
+
+<!-- Faixa de aprovação pendente — ocupa a largura toda porque bloqueia o fluxo -->
+{% if ticket.is_awaiting_approval %}
+<div class="itsm-card mb-3" id="approval-banner"
+     style="padding:1.25rem 1.5rem;border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.05);">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <div style="font-weight:600;font-size:.95rem;margin-bottom:.3rem;">
+        <i class="bi bi-hourglass-split me-2" style="color:var(--itsm-warning);"></i>
+        {% if perfil.can_approve %}Aguardando sua aprovação{% else %}Aguardando aprovação do gerente{% endif %}
+      </div>
+      <div style="font-size:.82rem;color:var(--itsm-muted);">
+        A categoria <strong>{{ ticket.category.name }}</strong> exige autorização.
+        O prazo de SLA só começa a contar depois da aprovação.
+      </div>
+    </div>
+  </div>
+
+  {% if perfil.can_approve %}
+  <div class="row g-2 mt-3">
+    <div class="col-md-6">
+      <form method="POST" action="{% url 'tickets:approve' ticket.pk %}">
+        {% csrf_token %}
+        <label class="form-label" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+          Parecer (opcional)
+        </label>
+        {{ approval_form.comment }}
+        <button type="submit" class="btn btn-itsm btn-sm w-100 mt-2">
+          <i class="bi bi-check2-circle me-1"></i>Aprovar e liberar para a fila
+        </button>
+      </form>
+    </div>
+    <div class="col-md-6">
+      <form method="POST" action="{% url 'tickets:reject' ticket.pk %}">
+        {% csrf_token %}
+        <label class="form-label" style="font-size:.72rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">
+          Motivo da rejeição (obrigatório)
+        </label>
+        <textarea name="comment" rows="3" class="form-control"
+                  placeholder="Por que o pedido está sendo negado? O solicitante vai ler."></textarea>
+        <button type="submit" class="btn btn-sm w-100 mt-2"
+                style="background:var(--itsm-danger);color:#fff;border:none;font-weight:600;font-size:.82rem;border-radius:6px;">
+          <i class="bi bi-x-circle me-1"></i>Rejeitar chamado
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="row g-3">
 
   <!-- COLUNA PRINCIPAL -->
@@ -41,6 +92,32 @@
         <i class="bi bi-calendar3 me-1"></i>{{ ticket.created_at|date:"d/m/Y H:i" }}
       </div>
     </div>
+
+    <!-- Decisão da aprovação — o parecer é para o solicitante, ele vê -->
+    {% if last_approval %}
+    <div class="itsm-card mb-3" id="approval-card" style="padding:1.5rem;
+         border-color:{% if last_approval.is_approved %}rgba(16,185,129,.35){% else %}rgba(239,68,68,.35){% endif %};">
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:.85rem;">
+        {% if last_approval.is_approved %}
+        <i class="bi bi-patch-check me-2" style="color:var(--itsm-success);"></i>Chamado aprovado
+        {% else %}
+        <i class="bi bi-x-octagon me-2" style="color:var(--itsm-danger);"></i>Chamado rejeitado
+        {% endif %}
+      </div>
+      {% if last_approval.comment %}
+      <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:1rem;">
+        <p style="margin:0;font-size:.9rem;line-height:1.75;white-space:pre-wrap;">{{ last_approval.comment }}</p>
+      </div>
+      {% endif %}
+      <div style="font-size:.8rem;color:var(--itsm-muted);margin-top:.85rem;">
+        {% if last_approval.decided_by %}
+        <i class="bi bi-person-check me-1"></i>{{ last_approval.decided_by.get_full_name|default:last_approval.decided_by.username }}
+        &nbsp;&bull;&nbsp;
+        {% endif %}
+        <i class="bi bi-calendar3 me-1"></i>{{ last_approval.created_at|date:"d/m/Y H:i" }}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Solução — aparece só depois de finalizado; o solicitante também vê -->
     {% if ticket.solution %}
@@ -160,8 +237,10 @@
   <!-- COLUNA LATERAL -->
   <div class="col-lg-4">
 
-    <!-- Atualizar ticket — só a equipe altera status, técnico e prioridade -->
-    {% if perfil.can_manage_tickets %}
+    <!-- Atualizar ticket — só a equipe altera status, técnico e prioridade.
+         Enquanto aguarda aprovação não há o que gerenciar: o chamado ainda
+         não foi autorizado e nem conta SLA. -->
+    {% if perfil.can_manage_tickets and not ticket.is_awaiting_approval %}
     <div class="itsm-card mb-3" style="padding:1.25rem;">
       <div style="font-weight:600;font-size:.9rem;margin-bottom:1rem;">
         <i class="bi bi-gear me-2" style="color:var(--itsm-accent);"></i>Atualizar Ticket

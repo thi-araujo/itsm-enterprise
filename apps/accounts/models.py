@@ -87,3 +87,8 @@ class UserProfile(models.Model):
     def can_see_reports(self):
         """Acessa os relatórios gerenciais."""
         return self.role in self.MANAGEMENT_ROLES
+
+    @property
+    def can_approve(self):
+        """Aprova ou rejeita os chamados que exigem autorização (Fase 3.3)."""
+        return self.role in self.MANAGEMENT_ROLES

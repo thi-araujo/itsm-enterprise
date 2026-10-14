@@ -11,6 +11,11 @@ def _equipe():
     """Usuários que recebem avisos de chamado: técnico, gerente e admin."""
     return User.objects.filter(profile__role__in=UserProfile.STAFF_ROLES)
 
+
+def _aprovadores():
+    """Quem decide as aprovações: gerente e admin (ver UserProfile.can_approve)."""
+    return User.objects.filter(profile__role__in=UserProfile.MANAGEMENT_ROLES)
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,6 +121,79 @@ def notify_ticket_resolved(ticket):
     _create_notification(
         ticket.requester, 'ticket_resolved',
         f"Seu ticket #{ticket.pk:04d} foi resolvido",
+        body, ticket_id=ticket.pk
+    )
+
+
+def notify_approval_requested(ticket):
+    """Avisa os aprovadores de que um chamado aguarda decisão (Fase 3.3).
+
+    Vai para gerentes e admins, e não para a equipe toda: enquanto não houver
+    aprovação, não há nada que um técnico possa fazer com este chamado.
+    """
+    aprovadores = list(_aprovadores())
+    categoria = ticket.category.name if ticket.category else '—'
+    subject = f"[ITSM Enterprise] Aprovação necessária — Ticket #{ticket.pk:04d}"
+    body = (
+        f"Um chamado aguarda sua aprovação.\n\n"
+        f"  ID:          #{ticket.pk:04d}\n"
+        f"  Título:      {ticket.title}\n"
+        f"  Categoria:   {categoria}\n"
+        f"  Prioridade:  {ticket.get_priority_display()}\n"
+        f"  Solicitante: {ticket.requester.get_full_name() or ticket.requester.username}\n\n"
+        f"Descrição:\n{ticket.description}\n\n"
+        f"O prazo de SLA só começa a contar depois da aprovação.\n\n"
+        f"Aprovar ou rejeitar: http://localhost:8000/tickets/{ticket.pk}/\n\n"
+        f"— ITSM Enterprise"
+    )
+    emails = [u.email for u in aprovadores if u.email]
+    _send_email(subject, body, emails)
+    for aprovador in aprovadores:
+        _create_notification(
+            aprovador, 'approval_requested',
+            f"Aprovação necessária: #{ticket.pk:04d} — {ticket.title[:50]}",
+            body, ticket_id=ticket.pk
+        )
+
+
+def notify_approval_decided(approval):
+    """Avisa o solicitante da decisão, com o parecer do gerente.
+
+    Ao contrário do motivo de escalonamento, que é interno, este parecer é
+    para o solicitante: ele precisa saber por que o pedido foi negado.
+    """
+    ticket   = approval.ticket
+    decisor  = approval.decided_by
+    aprovado = approval.is_approved
+    titulo   = 'aprovado' if aprovado else 'rejeitado'
+
+    subject = f"[ITSM Enterprise] Ticket #{ticket.pk:04d} {titulo}"
+    body = (
+        f"Olá, {ticket.requester.get_full_name() or ticket.requester.username}!\n\n"
+        f"Seu chamado foi {titulo}"
+        f"{' por ' + (decisor.get_full_name() or decisor.username) if decisor else ''}.\n\n"
+        f"  ID:     #{ticket.pk:04d}\n"
+        f"  Título: {ticket.title}\n"
+    )
+    if approval.comment:
+        rotulo = 'Parecer' if aprovado else 'Motivo da rejeição'
+        body += f"\n{rotulo}:\n{approval.comment}\n"
+    if aprovado:
+        body += ("\nO chamado entrou na fila de atendimento e o prazo de SLA "
+                 "começou a contar agora.\n")
+    else:
+        body += ("\nO chamado foi encerrado como rejeitado. Se precisar, abra "
+                 "um novo chamado com as informações solicitadas.\n")
+    body += (
+        f"\nAcesse: http://localhost:8000/tickets/{ticket.pk}/\n\n"
+        f"— ITSM Enterprise"
+    )
+
+    emails = [ticket.requester.email] if ticket.requester.email else []
+    _send_email(subject, body, emails)
+    _create_notification(
+        ticket.requester, 'approval_decided',
+        f"Seu ticket #{ticket.pk:04d} foi {titulo}",
         body, ticket_id=ticket.pk
     )
 

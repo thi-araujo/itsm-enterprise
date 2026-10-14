@@ -38,6 +38,12 @@
             <span class="sb-badge sb-badge-warn" id="unassigned-count" style="display:none;"></span>
         </a>
         {% endif %}
+        {% if user.profile.can_approve %}
+        <a href="{% url 'tickets:approvals' %}" class="sb-link {% if request.resolver_match.url_name == 'approvals' %}active{% endif %}">
+            <i class="bi bi-hourglass-split"></i> Aprovações
+            <span class="sb-badge sb-badge-warn" id="approval-count" style="display:none;"></span>
+        </a>
+        {% endif %}
         <a href="{% url 'tickets:create' %}" class="sb-link">
             <i class="bi bi-plus-circle"></i> Novo Chamado
         </a>
@@ -158,8 +164,10 @@ function updateBadges() {
             }
         }).catch(() => {});
 
-    // Tickets sem técnico
-    fetch("{% if user.is_authenticated %}{% url 'tickets:unassigned_count' %}{% else %}#{% endif %}")
+    // Tickets sem técnico. Só quem vê a fila consulta: para o solicitante a
+    // view responde um redirect e o fetch falharia de 60 em 60 segundos.
+    {% if user.profile.can_see_queue %}
+    fetch("{% url 'tickets:unassigned_count' %}")
         .then(r => r.json())
         .then(data => {
             const el = document.getElementById('unassigned-count');
@@ -168,6 +176,20 @@ function updateBadges() {
                 else { el.style.display = 'none'; }
             }
         }).catch(() => {});
+    {% endif %}
+
+    // Chamados aguardando aprovação (só gerente e admin decidem)
+    {% if user.profile.can_approve %}
+    fetch("{% url 'tickets:pending_approval_count' %}")
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('approval-count');
+            if (el) {
+                if (data.count > 0) { el.textContent = data.count; el.style.display = ''; }
+                else { el.style.display = 'none'; }
+            }
+        }).catch(() => {});
+    {% endif %}
 }
 
 {% if user.is_authenticated %}updateBadges(); setInterval(updateBadges, 60000);{% endif %}

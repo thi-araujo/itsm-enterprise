@@ -9,10 +9,10 @@ import logging
 import os
 
 from apps.accounts.models import UserProfile
-from apps.accounts.permissions import staff_required
-from .models import Ticket, Comment, Category, Attachment, Escalation
+from apps.accounts.permissions import management_required, staff_required
+from .models import Approval, Ticket, Comment, Category, Attachment, Escalation
 from .forms import (TicketForm, TicketUpdateForm, CommentForm,
-                    TicketFinishForm, EscalationForm)
+                    TicketFinishForm, EscalationForm, ApprovalForm)
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +113,18 @@ def ticket_detail(request, pk):
         finish_form = None
         escalate_form = None
 
+    # Aprovação (Fase 3.3). O parecer da decisão o solicitante VÊ — é para
+    # ele —, ao contrário do motivo do escalonamento, que é interno.
+    approval_form = ApprovalForm() if perfil.can_approve else None
+
     context = {
         'ticket':        ticket,
         'comment_form':  comment_form,
         'update_form':   update_form,
         'finish_form':   finish_form,
         'escalate_form': escalate_form,
+        'approval_form': approval_form,
+        'last_approval': ticket.last_approval,
         'comments':      comments,
         'attachments':   attachments,
         'escalations':   escalations,
@@ -135,15 +141,34 @@ def ticket_create(request):
         if form.is_valid():
             ticket = form.save(commit=False)
             ticket.requester = request.user
+
+            # Workflow de aprovação: categorias marcadas no /admin/ fazem o
+            # chamado nascer aguardando o gerente, e o save() do model deixa o
+            # SLA nulo até a aprovação.
+            precisa_aprovacao = bool(ticket.category and ticket.category.requires_approval)
+            if precisa_aprovacao:
+                ticket.status = 'pending_approval'
             ticket.save()
 
             try:
-                from apps.notifications.email import notify_ticket_created
-                notify_ticket_created(ticket)
+                from apps.notifications.email import (notify_approval_requested,
+                                                      notify_ticket_created)
+                # Enquanto não houver aprovação não há nada que um técnico
+                # possa fazer, então o aviso vai para quem decide.
+                if precisa_aprovacao:
+                    notify_approval_requested(ticket)
+                else:
+                    notify_ticket_created(ticket)
             except Exception:
                 logger.exception('Falha ao notificar criação do ticket #%s', ticket.pk)
 
-            messages.success(request, f'Ticket #{ticket.pk:04d} criado com sucesso!')
+            if precisa_aprovacao:
+                messages.success(
+                    request,
+                    f'Ticket #{ticket.pk:04d} criado e enviado para aprovação. '
+                    f'O prazo de SLA começa a contar quando o gerente aprovar.')
+            else:
+                messages.success(request, f'Ticket #{ticket.pk:04d} criado com sucesso!')
 
             # Anexo opcional: se for rejeitado, o ticket continua criado, mas o
             # usuário precisa saber que o arquivo não foi salvo.
@@ -165,7 +190,13 @@ def ticket_create(request):
     else:
         form = TicketForm()
 
-    context = {'form': form, **_politica_de_upload()}
+    context = {
+        'form': form,
+        # Avisa de antemão quais categorias passam por aprovação, para o
+        # solicitante não se surpreender com o chamado parado.
+        'approval_categories': Category.objects.filter(requires_approval=True),
+        **_politica_de_upload(),
+    }
     return render(request, 'tickets/create.html', context)
 
 
@@ -280,6 +311,110 @@ def ticket_escalate(request, pk):
     destino = escalation.to_user.get_full_name() or escalation.to_user.username
     messages.success(request, f'Chamado escalonado para {destino}.')
     return redirect('tickets:detail', pk=pk)
+
+
+# ══════════════════════════════════════════════════════════════════
+# Workflow de aprovação — Fase 3.3
+# ══════════════════════════════════════════════════════════════════
+
+
+@login_required
+@management_required
+def approval_queue(request):
+    """Fila dos chamados que aguardam decisão do gerente."""
+    pending = (Ticket.objects.filter(status='pending_approval')
+               .select_related('requester', 'category')
+               .order_by('created_at'))   # mais antigo primeiro: quem espera mais, decide antes
+
+    context = {
+        'pending': pending,
+        'total':   pending.count(),
+    }
+    return render(request, 'tickets/approvals.html', context)
+
+
+def _decidir_aprovacao(request, pk, decision):
+    """Registra uma decisão de aprovação. Compartilhado por aprovar/rejeitar.
+
+    Os dois caminhos validam o mesmo parecer, gravam o mesmo histórico e
+    mandam a mesma notificação — só o efeito no status muda.
+    """
+    ticket = get_object_or_404(Ticket, pk=pk)
+
+    if request.method != 'POST':
+        return redirect('tickets:detail', pk=pk)
+
+    # Impede decidir duas vezes, ou decidir um chamado que nunca precisou de
+    # aprovação (um POST direto na URL, por exemplo).
+    if not ticket.is_awaiting_approval:
+        messages.error(request, 'Este chamado não está aguardando aprovação.')
+        return redirect('tickets:detail', pk=pk)
+
+    form = ApprovalForm(request.POST, decision=decision)
+    if not form.is_valid():
+        for erros in form.errors.values():
+            for erro in erros:
+                messages.error(request, erro)
+        return redirect('tickets:detail', pk=pk)
+
+    approval            = form.save(commit=False)
+    approval.ticket     = ticket
+    approval.decided_by = request.user
+    approval.decision   = decision
+    approval.save()
+
+    if approval.is_approved:
+        ticket.status = 'open'
+        # O relógio do SLA começa AGORA, não na abertura: o chamado ficou
+        # parado esperando uma decisão que não era do solicitante nem da
+        # equipe. Ver Ticket.start_sla.
+        ticket.start_sla()
+        aviso = (f'Chamado #{ticket.pk:04d} aprovado e liberado para a fila. '
+                 f'SLA até {ticket.sla_deadline.strftime("%d/%m/%Y %H:%M")}.')
+    else:
+        ticket.status = 'rejected'
+        aviso = f'Chamado #{ticket.pk:04d} rejeitado. O solicitante foi avisado.'
+    ticket.save()
+
+    # O parecer também entra na linha do tempo, como comentário público: é
+    # informação que o solicitante pode ver.
+    if approval.comment:
+        rotulo = 'Aprovação' if approval.is_approved else 'Rejeição'
+        Comment.objects.create(
+            ticket=ticket, author=request.user, is_internal=False,
+            content=f"{rotulo} do chamado.\n\n{approval.comment}",
+        )
+
+    try:
+        from apps.notifications.email import notify_approval_decided
+        notify_approval_decided(approval)
+    except Exception:
+        logger.exception('Falha ao notificar decisão de aprovação do ticket #%s', pk)
+
+    messages.success(request, aviso)
+    return redirect('tickets:detail', pk=pk)
+
+
+@login_required
+@management_required
+def ticket_approve(request, pk):
+    """Aprova o chamado: libera para a fila e inicia a contagem do SLA."""
+    return _decidir_aprovacao(request, pk, Approval.DECISION_APPROVED)
+
+
+@login_required
+@management_required
+def ticket_reject(request, pk):
+    """Rejeita o chamado, com motivo obrigatório. Status terminal."""
+    return _decidir_aprovacao(request, pk, Approval.DECISION_REJECTED)
+
+
+@login_required
+@management_required
+def pending_approval_count(request):
+    """Contador do badge "Aprovações" na sidebar."""
+    from django.http import JsonResponse
+    return JsonResponse({'count': Ticket.objects.filter(status='pending_approval').count()})
 
 
 @login_required

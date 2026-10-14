@@ -30,6 +30,13 @@
         <div class="col-md-4">
           <label class="form-label" style="font-size:.8rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">Categoria</label>
           {{ form.category }}
+          {% if approval_categories %}
+          <div style="font-size:.72rem;color:var(--itsm-warning);margin-top:.3rem;">
+            <i class="bi bi-hourglass-split me-1"></i>
+            Exige aprovação:
+            {% for c in approval_categories %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+          </div>
+          {% endif %}
         </div>
         <div class="col-md-4">
           <label class="form-label" style="font-size:.8rem;color:var(--itsm-muted);text-transform:uppercase;letter-spacing:1px;">Prioridade</label>

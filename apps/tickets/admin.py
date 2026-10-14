@@ -1,9 +1,13 @@
 from django.contrib import admin
-from .models import Ticket, Category, Comment, Attachment, Escalation
+from .models import Ticket, Category, Comment, Attachment, Escalation, Approval
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'color', 'created_at']
+    # requires_approval editavel na propria lista: e o botao de liga/desliga
+    # do workflow de aprovacao.
+    list_display  = ['name', 'requires_approval', 'color', 'created_at']
+    list_editable = ['requires_approval']
+    list_filter   = ['requires_approval']
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
@@ -11,6 +15,13 @@ class TicketAdmin(admin.ModelAdmin):
     list_filter   = ['status', 'priority', 'ticket_type', 'category']
     search_fields = ['title', 'description']
     list_editable = ['status', 'assignee']
+
+@admin.register(Approval)
+class ApprovalAdmin(admin.ModelAdmin):
+    list_display  = ['ticket', 'decision', 'decided_by', 'created_at']
+    list_filter   = ['decision', 'decided_by', 'created_at']
+    search_fields = ['comment']
+
 
 @admin.register(Escalation)
 class EscalationAdmin(admin.ModelAdmin):
