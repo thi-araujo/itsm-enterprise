@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'django_htmx',
+    'rest_framework',
+    'rest_framework.authtoken',
 
     'apps.accounts.apps.AccountsConfig',
     'apps.tickets.apps.TicketsConfig',
@@ -33,6 +35,7 @@ INSTALLED_APPS = [
     'apps.notifications.apps.NotificationsConfig',
     'apps.reports.apps.ReportsConfig',
     'apps.dashboard.apps.DashboardConfig',
+    'apps.api.apps.ApiConfig',
 ]
 
 MIDDLEWARE = [
@@ -119,6 +122,38 @@ MAX_UPLOAD_SIZE_MB = 10
 # Derivados de MAX_UPLOAD_SIZE_MB — alterar só a constante acima.
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+# ──────────────────────────────────────────────────────────────────
+# API REST (Fase 3.5) — ver docs/API.md
+# ──────────────────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    # Token: o que uma integração externa usa (POST /api/v1/token/).
+    # Sessão: permite navegar a API no browser com o login normal.
+    #
+    # O token vem primeiro de propósito: o DRF monta o desafio de
+    # autenticação a partir da primeira classe da lista, e só a de token
+    # oferece um. Com a sessão à frente, uma requisição sem credencial
+    # receberia 403 ("proibido") em vez de 401 ("não autenticado").
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # Nada aberto ao anônimo: sem credencial, 401/403.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 25,
+    # Uma integração com defeito não derruba o banco.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/min',
+        'user': '1000/hour',
+    },
+}
 
 # ──────────────────────────────────────────────────────────────────
 # Automações de SLA (Fase 3.7) — usadas por apps/tickets/automation.py

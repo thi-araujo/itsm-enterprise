@@ -271,8 +271,60 @@ mostrando "Sistema"; **segunda execução não repetiu nada** (0 · 0 · 0).
 > ⚠️ A primeira execução real vai processar o acúmulo dos 9 chamados vencidos
 > de uma vez, com os e-mails correspondentes. Rode `--dry-run` antes.
 
-### 3.5, 3.6 e 3.8
-- [ ] API REST (DRF)
-- [ ] Dashboard avançado
-- [ ] Automações (escalonamento por SLA)
-- [ ] Integração AD/LDAP
+### ✅ 3.5 — API REST (DRF) — Concluída
+**Refactor que sustenta a fase:** as regras que mudam o estado de um chamado
+(finalizar, escalonar, decidir aprovação, comentar) saíram das views para
+`apps/tickets/services.py`. A tela HTML e a API chamam **a mesma função** — sem
+isso haveria duas implementações da mesma regra, divergindo na primeira
+mudança. Os 201 testes existentes foram a rede de segurança: passaram todos
+depois do refactor, sem alteração.
+
+- [x] `djangorestframework>=3.15` — única dependência nova
+- [x] App `apps/api/` (`serializers.py`, `views.py`, `permissions.py`, `urls.py`)
+      com prefixo versionado **`/api/v1/`**
+- [x] Autenticação por **token** (`POST /api/v1/token/`) e por **sessão**
+      (API navegável no browser). O token vem primeiro no settings de
+      propósito: só ele monta o desafio, então sem credencial a resposta é
+      **401** e não 403
+- [x] **O RBAC da Fase 3.1 vale na API de graça**: `get_queryset()` usa
+      `Ticket.objects.visible_to(user)`. Chamado alheio devolve **404**, como
+      no HTML
+- [x] Notas internas filtradas no queryset — não trafegam para o solicitante
+- [x] `IsStaff` / `IsManagement` / `ReadOnlyOrStaff` espelhando os decorators,
+      lendo as mesmas propriedades do `UserProfile`
+- [x] Ações: `finalizar`, `escalonar`, `aprovar`, `rejeitar`, `comentarios`,
+      `anexos`, `escalonamentos`, `auditoria`, `aprovacoes`
+- [x] `/eu/` devolve papel e permissões, para o cliente não adivinhar
+- [x] `/estatisticas/` com números agregados já filtrados por perfil — é o
+      endpoint que a **Fase 3.6** vai consumir
+- [x] `/categorias/` e `/ativos/` (somente leitura), `/tecnicos/`
+- [x] Filtros iguais aos da tela (`status`, `priority`, `assignee=me|unassigned`,
+      `search`, `ordering`), paginação de 25 e throttling (20/min anônimo,
+      1000/h autenticado)
+- [x] Status do workflow fora do `PATCH`: o serializer remove
+      `pending_approval` e `rejected` das `choices`, e o DRF recusa um PATCH
+      forjado sem validação extra — mesma técnica do formulário HTML
+- [x] `DELETE` não existe em chamado (405): o histórico é o registro
+- [x] `docs/API.md` com endpoints, exemplos de `curl` e tabela de erros
+- [x] 60 testes novos — suíte total: **261 testes**
+
+**Três bugs que os testes pegaram** (e que teriam passado despercebidos):
+1. `serializer.save()` na abertura gravava o chamado **sem autor**, então a
+   entrada "Abriu o chamado" saía como "Sistema". Corrigido montando a
+   instância antes e salvando uma vez com `save_as` — o que também fez o
+   status de aprovação valer já no INSERT, deixando o SLA nulo naturalmente.
+2. O mesmo no `PATCH`: o `_audit_user` agora vai na instância **antes** do
+   `serializer.save()`.
+3. O solicitante recebia **403 ao comentar** no próprio chamado, porque a
+   permissão de escrita do ViewSet valia para a ação `comentarios`.
+
+**Verificado com `curl` contra o servidor rodando:** 401 sem credencial;
+token obtido por usuário+senha; abertura (201); solução "ok" recusada com
+**a mesma mensagem da tela**; `PATCH` assumindo o chamado (200); `PATCH` com
+`status=rejected` recusado (400); finalização (200); e a trilha de auditoria
+com o autor correto em todas as cinco entradas. O chamado de teste foi
+removido do banco.
+
+### 3.6 e 3.8 — pendentes
+- [ ] 3.6 Dashboard avançado (vai consumir `/api/v1/estatisticas/`)
+- [ ] 3.8 Integração AD/LDAP

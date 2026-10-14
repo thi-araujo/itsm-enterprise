@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.http import HttpResponse, Http404
@@ -10,12 +12,24 @@ import os
 
 from apps.accounts.models import UserProfile
 from apps.accounts.permissions import management_required, staff_required
+from . import services
 from .models import (Approval, AuditLog, Ticket, Comment, Category, Attachment,
                      Escalation)
 from .forms import (TicketForm, TicketUpdateForm, CommentForm,
                     TicketFinishForm, EscalationForm, ApprovalForm)
 
 logger = logging.getLogger(__name__)
+
+
+def _mensagens_do_erro(erro):
+    """Extrai as mensagens de um ValidationError, com ou sem campo.
+
+    As regras em services.py levantam ValidationError — às vezes com um dicionário
+    por campo, às vezes com uma mensagem solta. A view só quer o texto.
+    """
+    if hasattr(erro, 'message_dict'):
+        return [m for mensagens in erro.message_dict.values() for m in mensagens]
+    return list(erro.messages)
 
 
 def _validar_anexo(arquivo):
@@ -238,45 +252,27 @@ def ticket_update_status(request, pk):
 def ticket_finish(request, pk):
     """Finaliza o chamado exigindo a solução (Fase 3.2).
 
-    Leva a "Resolvido", não a "Fechado": no ITIL quem fecha é o solicitante,
-    depois de confirmar. "Resolvido" significa "o técnico terminou, aguardando
-    confirmação".
+    A regra em si está em services.finalizar_chamado, compartilhada com a
+    API REST. Aqui ficam só o formulário, as mensagens e o redirect.
     """
     ticket = get_object_or_404(Ticket, pk=pk)
 
     if request.method != 'POST':
         return redirect('tickets:detail', pk=pk)
 
-    if not ticket.can_be_finished:
-        messages.error(request, 'Este chamado já está resolvido ou fechado.')
-        return redirect('tickets:detail', pk=pk)
-
     form = TicketFinishForm(request.POST, instance=ticket)
     if not form.is_valid():
-        # Mostra o erro de validação do form (solução vazia ou curta demais).
         for erro in form.errors.get('solution', ['Informe a solução.']):
             messages.error(request, erro)
         return redirect('tickets:detail', pk=pk)
 
-    ticket = form.save(commit=False)
-    ticket.status      = 'resolved'
-    ticket.resolved_by = request.user
-    # resolved_at é preenchido pelo save() do model quando o status vira
-    # 'resolved' — não repetir aqui.
-    ticket.save_as(request.user)
-
-    # A solução também entra no histórico como comentário público, para o
-    # solicitante ler na mesma linha do tempo dos outros comentários.
-    Comment.objects.create(
-        ticket=ticket, author=request.user, is_internal=False,
-        content=f"Chamado finalizado.\n\nSolução: {ticket.solution}",
-    )
-
     try:
-        from apps.notifications.email import notify_ticket_resolved
-        notify_ticket_resolved(ticket)
-    except Exception:
-        logger.exception('Falha ao notificar resolução do ticket #%s', pk)
+        services.finalizar_chamado(ticket, request.user,
+                                   form.cleaned_data['solution'])
+    except ValidationError as erro:
+        for mensagem in _mensagens_do_erro(erro):
+            messages.error(request, mensagem)
+        return redirect('tickets:detail', pk=pk)
 
     messages.success(request, f'Chamado #{ticket.pk:04d} finalizado com sucesso!')
     return redirect('tickets:detail', pk=pk)
@@ -285,48 +281,33 @@ def ticket_finish(request, pk):
 @login_required
 @staff_required
 def ticket_escalate(request, pk):
-    """Repassa o chamado a outro membro da equipe, com motivo registrado."""
+    """Repassa o chamado a outro membro da equipe, com motivo registrado.
+
+    A regra está em services.escalonar_chamado; o form cuida de oferecer só
+    destinos válidos (ver EscalationForm).
+    """
     ticket = get_object_or_404(Ticket, pk=pk)
 
     if request.method != 'POST':
-        return redirect('tickets:detail', pk=pk)
-
-    if not ticket.can_be_escalated:
-        messages.error(request, 'Chamado resolvido ou fechado não pode ser escalonado.')
         return redirect('tickets:detail', pk=pk)
 
     # `user=request.user` tira o próprio usuário da lista de destinos: um POST
     # forjado escalonando para si mesmo cai como destino inválido.
     form = EscalationForm(request.POST, user=request.user)
     if not form.is_valid():
-        for campo, erros in form.errors.items():
+        for erros in form.errors.values():
             for erro in erros:
                 messages.error(request, erro)
         return redirect('tickets:detail', pk=pk)
 
-    escalation           = form.save(commit=False)
-    escalation.ticket    = ticket
-    escalation.from_user = request.user
-    escalation.save()
-
-    ticket.assignee = escalation.to_user
-    # Um chamado escalonado está em atendimento, não mais só "aberto".
-    if ticket.status == 'open':
-        ticket.status = 'in_progress'
-    ticket.save_as(request.user)
-
-    # A troca de responsável e de status já é auditada pelo save(); esta
-    # entrada registra o evento em si, com o destino.
-    destino_log = (escalation.to_user.get_full_name()
-                   or escalation.to_user.username)
-    AuditLog.registrar(ticket, request.user, AuditLog.ACTION_ESCALATED,
-                       f'para {destino_log}')
-
     try:
-        from apps.notifications.email import notify_ticket_escalated
-        notify_ticket_escalated(escalation)
-    except Exception:
-        logger.exception('Falha ao notificar escalonamento do ticket #%s', pk)
+        escalation = services.escalonar_chamado(
+            ticket, request.user,
+            form.cleaned_data['to_user'], form.cleaned_data['reason'])
+    except ValidationError as erro:
+        for mensagem in _mensagens_do_erro(erro):
+            messages.error(request, mensagem)
+        return redirect('tickets:detail', pk=pk)
 
     destino = escalation.to_user.get_full_name() or escalation.to_user.username
     messages.success(request, f'Chamado escalonado para {destino}.')
@@ -354,20 +335,10 @@ def approval_queue(request):
 
 
 def _decidir_aprovacao(request, pk, decision):
-    """Registra uma decisão de aprovação. Compartilhado por aprovar/rejeitar.
-
-    Os dois caminhos validam o mesmo parecer, gravam o mesmo histórico e
-    mandam a mesma notificação — só o efeito no status muda.
-    """
+    """Casca HTML da decisão. A regra está em services.decidir_aprovacao."""
     ticket = get_object_or_404(Ticket, pk=pk)
 
     if request.method != 'POST':
-        return redirect('tickets:detail', pk=pk)
-
-    # Impede decidir duas vezes, ou decidir um chamado que nunca precisou de
-    # aprovação (um POST direto na URL, por exemplo).
-    if not ticket.is_awaiting_approval:
-        messages.error(request, 'Este chamado não está aguardando aprovação.')
         return redirect('tickets:detail', pk=pk)
 
     form = ApprovalForm(request.POST, decision=decision)
@@ -377,46 +348,23 @@ def _decidir_aprovacao(request, pk, decision):
                 messages.error(request, erro)
         return redirect('tickets:detail', pk=pk)
 
-    approval            = form.save(commit=False)
-    approval.ticket     = ticket
-    approval.decided_by = request.user
-    approval.decision   = decision
-    approval.save()
+    try:
+        approval = services.decidir_aprovacao(
+            ticket, request.user, decision, form.cleaned_data['comment'])
+    except ValidationError as erro:
+        for mensagem in _mensagens_do_erro(erro):
+            messages.error(request, mensagem)
+        return redirect('tickets:detail', pk=pk)
 
     if approval.is_approved:
-        ticket.status = 'open'
-        # O relógio do SLA começa AGORA, não na abertura: o chamado ficou
-        # parado esperando uma decisão que não era do solicitante nem da
-        # equipe. Ver Ticket.start_sla.
-        ticket.start_sla()
-        aviso = (f'Chamado #{ticket.pk:04d} aprovado e liberado para a fila. '
-                 f'SLA até {ticket.sla_deadline.strftime("%d/%m/%Y %H:%M")}.')
+        messages.success(
+            request,
+            f'Chamado #{ticket.pk:04d} aprovado e liberado para a fila. '
+            f'SLA até {timezone.localtime(ticket.sla_deadline):%d/%m/%Y %H:%M}.')
     else:
-        ticket.status = 'rejected'
-        aviso = f'Chamado #{ticket.pk:04d} rejeitado. O solicitante foi avisado.'
-    ticket.save_as(request.user)
-
-    AuditLog.registrar(
-        ticket, request.user,
-        AuditLog.ACTION_APPROVED if approval.is_approved else AuditLog.ACTION_REJECTED,
-        approval.comment[:200])
-
-    # O parecer também entra na linha do tempo, como comentário público: é
-    # informação que o solicitante pode ver.
-    if approval.comment:
-        rotulo = 'Aprovação' if approval.is_approved else 'Rejeição'
-        Comment.objects.create(
-            ticket=ticket, author=request.user, is_internal=False,
-            content=f"{rotulo} do chamado.\n\n{approval.comment}",
-        )
-
-    try:
-        from apps.notifications.email import notify_approval_decided
-        notify_approval_decided(approval)
-    except Exception:
-        logger.exception('Falha ao notificar decisão de aprovação do ticket #%s', pk)
-
-    messages.success(request, aviso)
+        messages.success(
+            request,
+            f'Chamado #{ticket.pk:04d} rejeitado. O solicitante foi avisado.')
     return redirect('tickets:detail', pk=pk)
 
 
@@ -448,21 +396,12 @@ def add_comment(request, pk):
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
-            comment = form.save(commit=False)
-            comment.ticket = ticket
-            comment.author = request.user
-            # Solicitante não cria nota interna, mesmo forjando o POST.
-            if not request.user.profile.can_see_internal_notes:
-                comment.is_internal = False
-            comment.save()
-            AuditLog.registrar(
-                ticket, request.user, AuditLog.ACTION_COMMENTED,
-                'nota interna' if comment.is_internal else '')
-            try:
-                from apps.notifications.email import notify_comment_added
-                notify_comment_added(comment)
-            except Exception:
-                logger.exception('Falha ao notificar comentário no ticket #%s', pk)
+            # services.comentar_chamado já força is_internal=False para
+            # quem não pode ver nota interna, mesmo com o POST forjado.
+            comment = services.comentar_chamado(
+                ticket, request.user,
+                form.cleaned_data['content'],
+                form.cleaned_data.get('is_internal', False))
             if request.htmx:
                 return render(request, 'partials/comment_item.html', {'comment': comment})
     return redirect('tickets:detail', pk=pk)

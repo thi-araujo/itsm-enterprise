@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from apps.accounts.models import UserProfile
+from . import services
 from .models import Approval, Ticket, Comment, Escalation
 
 
@@ -99,11 +100,10 @@ class TicketFinishForm(forms.ModelForm):
 
     def clean_solution(self):
         solution = self.cleaned_data['solution'].strip()
-        # Sem o mínimo, "ok" passaria a valer como documentação da solução.
-        if len(solution) < 10:
-            raise forms.ValidationError(
-                'Descreva a solução com pelo menos 10 caracteres — '
-                'ela vai para o solicitante e fica no histórico do chamado.')
+        # O mínimo e a mensagem vêm de services.py, a mesma fonte que a API
+        # usa. Sem o mínimo, "ok" passaria a valer como documentação.
+        if len(solution) < services.MIN_SOLUTION_LENGTH:
+            raise forms.ValidationError(services.ERRO_SOLUCAO_CURTA)
         return solution
 
 
@@ -141,10 +141,8 @@ class EscalationForm(forms.ModelForm):
 
     def clean_reason(self):
         reason = self.cleaned_data['reason'].strip()
-        if len(reason) < 10:
-            raise forms.ValidationError(
-                'Explique o motivo com pelo menos 10 caracteres — '
-                'quem receber o chamado precisa entender o contexto.')
+        if len(reason) < services.MIN_REASON_LENGTH:
+            raise forms.ValidationError(services.ERRO_MOTIVO_CURTO)
         return reason
 
 
@@ -177,8 +175,7 @@ class ApprovalForm(forms.ModelForm):
 
     def clean_comment(self):
         comment = self.cleaned_data['comment'].strip()
-        if self.decision == Approval.DECISION_REJECTED and len(comment) < 10:
-            raise forms.ValidationError(
-                'Explique o motivo da rejeição com pelo menos 10 caracteres — '
-                'o solicitante precisa saber por que o pedido foi negado.')
+        if (self.decision == Approval.DECISION_REJECTED
+                and len(comment) < services.MIN_REASON_LENGTH):
+            raise forms.ValidationError(services.ERRO_REJEICAO_CURTA)
         return comment

@@ -6,11 +6,12 @@ Mantenha-o curto e atualizado. Detalhes longos ficam em `docs/`.
 ## Sobre o projeto
 - **Nome oficial:** ITSM Enterprise (Help Desk corporativo inspirado no ServiceNow)
 - **Autor:** Thiago — Analista de Infraestrutura, desenvolvedor Python iniciante
-- **Stack:** Python 3.13 · Django 6.0 · SQLite (dev) → PostgreSQL (prod) · Bootstrap 5 · HTMX · Chart.js
+- **Stack:** Python 3.13 · Django 6.0 · Django REST Framework · SQLite (dev) → PostgreSQL (prod) · Bootstrap 5 · HTMX · Chart.js
 - **Sistema operacional de desenvolvimento:** Windows 11 + PowerShell + PyCharm
 - **Roadmap completo:** ver @docs/ROADMAP.md
 - **Status de cada fase:** ver @docs/STATUS.md
 - **Automações de SLA e agendamento:** ver @docs/AUTOMACAO_SLA.md
+- **API REST:** ver @docs/API.md
 
 ## Regras obrigatórias
 1. O nome do sistema é **ITSM Enterprise**. A palavra "RAVEN" (e variações `raven`, `Raven`) NÃO deve existir em nenhum arquivo, classe CSS, variável, template, e-mail ou comentário.
@@ -49,7 +50,8 @@ itsm_enterprise/
 │   ├── cmdb/              # ativos de TI
 │   ├── notifications/     # notificações internas e e-mails
 │   ├── reports/           # relatórios
-│   └── dashboard/         # painel principal
+│   ├── dashboard/         # painel principal
+│   └── api/               # API REST (serializers, viewsets) — prefixo /api/v1/
 ├── templates/             # base.html + uma pasta por app + partials/
 ├── static/                # css/, js/, img/
 └── media/                 # uploads (anexos)
@@ -61,6 +63,10 @@ itsm_enterprise/
 - Feedback ao usuário via `django.contrib.messages`.
 - Cada app tem `urls.py` com `app_name` definido; usar sempre `{% url 'app:nome' %}`.
 - Ao mover apps para `apps/`, o `AppConfig` deve ter `name = 'apps.<app>'` e **manter `label = '<app>'`** para não quebrar migrações, tabelas e ForeignKeys existentes.
+- Regra de negócio que muda o estado de um chamado (finalizar, escalonar, aprovar,
+  comentar) vive em `apps/tickets/services.py`, **nunca** na view nem no serializer:
+  a tela HTML e a API REST chamam a mesma função. As funções levantam
+  `ValidationError`; cada camada traduz (a view para `messages`, a API para HTTP 400).
 - Upload permitido: .pdf .doc .docx .xls .xlsx .png .jpg .jpeg .txt .log .zip — máx. 10 MB.
 - SLA por prioridade: Crítica 2h · Alta 8h · Média 24h · Baixa 72h.
 - Ticket sem técnico (`assignee` nulo) deve funcionar em TODOS os templates: use `{% if ticket.assignee %}` em vez de encadear `|default` sobre atributos de objeto nulo.

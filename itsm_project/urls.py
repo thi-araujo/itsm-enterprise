@@ -14,6 +14,9 @@ urlpatterns = [
     path('cmdb/', include('apps.cmdb.urls')),
     path('notifications/', include('apps.notifications.urls')),
     path('reports/', include('apps.reports.urls')),
+
+    # API REST versionada (Fase 3.5) — ver docs/API.md
+    path('api/v1/', include('apps.api.urls')),
 ]
 
 if settings.DEBUG:
