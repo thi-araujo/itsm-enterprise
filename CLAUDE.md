@@ -36,7 +36,7 @@ python manage.py runserver 0.0.0.0:8000     # rodar acessível na rede local
 python manage.py check_sla                  # automações de SLA (aviso, vencimento, escalonamento)
 python manage.py check_sla --dry-run        # mostra o que faria, sem gravar
 python manage.py ldap_check                 # diagnóstico da conexão com o AD
-python manage.py ldap_check --user thiago   # testa o login e lista os grupos
+python manage.py ldap_check --user joao.silva   # testa o login e lista os grupos
 python manage.py createsuperuser            # criar admin
 ```
 

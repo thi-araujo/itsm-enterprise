@@ -41,7 +41,7 @@ controlador de domínio cair não pode trancar ninguém fora do sistema.
 | Verificação | Resultado |
 |---|---|
 | DNS de `exemplo.local` | resolve para `192.168.10.4` |
-| Controlador de domínio | `dc01.exemplo.local` (registro SRV) |
+| Controlador de domínio | `dc01.exemplo.local` = `192.168.10.4` (registro SRV) |
 | LDAP na porta 389 | ✅ responde, e a base `DC=exemplo,DC=local` confere |
 | LDAPS na porta 636 | ❌ a conexão TCP abre e o TLS é derrubado |
 | StartTLS na 389 | ❌ o servidor responde `unavailable` |
@@ -97,11 +97,14 @@ WARNINGS:
 .\venv\Scripts\Activate.ps1
 
 python manage.py ldap_check                 # configuração, DNS, porta, TLS
-python manage.py ldap_check --user thiago   # bind + grupos reais da conta
+python manage.py ldap_check --user joao.silva   # bind + grupos reais
 ```
 
 O comando funciona mesmo com `LDAP_ENABLED` desligado — é para isso que ele
 existe: validar antes de ligar.
+
+Se a conexão falhar, o `--user` **não** é executado e a senha não é pedida:
+sem conexão não há onde autenticar.
 
 O `--user` é o passo que resolve o mapeamento de grupos. Ele imprime os grupos
 que a conta **realmente** tem no AD e qual papel o `LDAP_GROUP_ROLE_MAP` atual
@@ -178,6 +181,18 @@ versionado. Os padrões estão em `itsm_project/settings.py`.
 | `ITSM_LDAP_NESTED_GROUPS` | `0` | segue grupos aninhados (uma consulta a mais) |
 
 `LDAP_USE_SSL` é derivado: liga sozinho quando a porta é 636.
+
+### Nome do servidor, e não o IP
+
+O padrão é o nome `dc01.exemplo.local`, embora o DC seja o `192.168.10.4`.
+Isso é de propósito: um certificado é emitido para o **nome** da máquina, então
+validar o certificado por IP falharia sempre. Use o IP apenas como última
+saída, numa máquina onde o DNS do domínio não esteja disponível:
+
+```powershell
+$env:ITSM_LDAP_SERVER = "192.168.10.4"
+$env:ITSM_LDAP_PORT   = "389"     # por IP, a validação de certificado não vale
+```
 
 ### Conta de serviço — normalmente não precisa
 

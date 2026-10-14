@@ -36,11 +36,19 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opcoes):
         self._mostrar_configuracao()
+        username = opcoes.get('user')
 
         if not self._testar_conexao():
+            if username:
+                # Sem conexão não há o que autenticar. Dizer isso evita a
+                # leitura de que o problema é a conta ou a senha — o comando
+                # nem chegou a pedi-la.
+                self.stdout.write(self.style.WARNING(
+                    f'\n  O teste de login de {username} não foi executado: '
+                    'sem conexão com o\n  servidor não há onde autenticar. '
+                    'A senha não foi pedida.'))
             return
 
-        username = opcoes.get('user')
         if not username:
             self.stdout.write(
                 '\nPara testar o login e descobrir os grupos de uma conta:\n'
