@@ -259,10 +259,19 @@ LDAP_TIMEOUT = int(os.environ.get('ITSM_LDAP_TIMEOUT', '5'))
 LDAP_BIND_DN = os.environ.get('ITSM_LDAP_BIND_DN', '')
 LDAP_BIND_PASSWORD = os.environ.get('ITSM_LDAP_BIND_PASSWORD', '')
 
-# `{username}` é substituído pelo que a pessoa digitou (já escapado).
-# `sAMAccountName` é o nome de logon curto do AD — o mesmo que ela usa no
-# Windows.
-LDAP_USER_FILTER = '(&(objectClass=user)(sAMAccountName={username}))'
+# Como a conta é localizada no diretório. Dois marcadores, ambos já escapados
+# por quem monta o filtro:
+#   `{username}` — o nome curto (`lara`), comparado com `sAMAccountName`
+#   `{upn}`      — o UPN completo (`lara@araujo.corp`), comparado com
+#                  `userPrincipalName`
+#
+# Procurar pelos dois é necessário porque no AD **eles são campos
+# independentes**. O bind simples é validado contra o `userPrincipalName`,
+# então uma conta cujo `sAMAccountName` seja diferente do prefixo do UPN
+# autentica e, se procurássemos só pelo nome curto, não seria encontrada — o
+# login falharia depois de a senha ter sido aceita.
+LDAP_USER_FILTER = ('(&(objectClass=user)'
+                    '(|(sAMAccountName={username})(userPrincipalName={upn})))')
 
 # Grupo do AD → papel do ITSM. Lista **ordenada**: o primeiro que casar vence,
 # então o papel mais privilegiado vem primeiro.

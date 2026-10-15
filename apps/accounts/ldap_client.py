@@ -45,7 +45,7 @@ class UsuarioLdap:
     """
 
     def __init__(self, username, first_name='', last_name='', email='',
-                 department='', groups=None, dn=''):
+                 department='', groups=None, dn='', upn=''):
         self.username   = username
         self.first_name = first_name
         self.last_name  = last_name
@@ -53,6 +53,10 @@ class UsuarioLdap:
         self.department = department
         self.groups     = list(groups or [])
         self.dn         = dn
+        # Guardado só para o diagnóstico poder mostrar os dois identificadores
+        # lado a lado: é a confusão entre eles que faz o bind passar e a busca
+        # não achar a conta.
+        self.upn        = upn
 
     def __repr__(self):
         return f'<UsuarioLdap {self.username} grupos={self.groups}>'
@@ -60,8 +64,8 @@ class UsuarioLdap:
 
 # Atributos que pedimos ao AD. Pedir só o necessário mantém a resposta pequena
 # e deixa explícito, para quem lê, de onde vem cada campo do perfil.
-ATRIBUTOS = ['sAMAccountName', 'givenName', 'sn', 'mail', 'department',
-             'displayName', 'memberOf']
+ATRIBUTOS = ['sAMAccountName', 'userPrincipalName', 'givenName', 'sn', 'mail',
+             'department', 'displayName', 'memberOf']
 
 # OID do "matching rule in chain" do AD: faz o servidor seguir a cadeia de
 # grupos aninhados (grupo dentro de grupo). Sem ele, `memberOf` traz apenas os
@@ -299,6 +303,20 @@ def _fechar(conexao):
         pass
 
 
+def _nome_curto(username):
+    """O `sAMAccountName` a partir do que a pessoa digitou.
+
+    Ela pode digitar `lara`, `lara@araujo.corp` ou `ARAUJO\\lara` — as três
+    formas funcionam no Windows. Para comparar com `sAMAccountName`, que é só
+    `lara`, o domínio tem de sair.
+    """
+    if '\\' in username:
+        username = username.rsplit('\\', 1)[-1]
+    if '@' in username:
+        username = username.split('@', 1)[0]
+    return username
+
+
 def _montar_upn(username):
     """Transforma `thiago` em `thiago@exemplo.local`.
 
@@ -324,7 +342,14 @@ def _buscar_usuario(conexao, username, relatorio=None):
     """
     from ldap3 import SUBTREE
 
-    filtro = settings.LDAP_USER_FILTER.format(username=_escapar(username))
+    # Procura pelo nome curto **e** pelo UPN. No AD os dois são campos
+    # independentes, e o bind é validado contra o UPN: a conta cujo
+    # `sAMAccountName` não bate com o prefixo do UPN autenticaria e não seria
+    # encontrada aqui — a senha é aceita e o login falha logo depois.
+    filtro = settings.LDAP_USER_FILTER.format(
+        username=_escapar(_nome_curto(username)),
+        upn=_escapar(_montar_upn(username)),
+    )
     conexao.search(
         search_base=settings.LDAP_SEARCH_BASE,
         search_filter=filtro,
@@ -392,6 +417,7 @@ def _montar_usuario(entrada, dn, username, grupos=None):
         department=_primeiro(entrada, 'department'),
         groups=grupos,
         dn=dn,
+        upn=_primeiro(entrada, 'userPrincipalName'),
     )
 
 

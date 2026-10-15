@@ -439,7 +439,19 @@ total 1 contra 13 da equipe.
       fazer, e separa isso de "bind aceito mas a conta não apareceu na busca"
       (base errada × sem permissão de leitura), que era o outro caminho de
       recusa silenciosa
-- [x] 76 testes novos — suíte total: **369 testes**
+- [x] **Busca da conta pelo `sAMAccountName` ou pelo `userPrincipalName`**:
+      no AD os dois são campos independentes e o bind simples é validado
+      contra o **UPN**. A conta cujo nome curto não é o prefixo do UPN
+      (`lara@dominio` + `sAMAccountName=lara.souza`) autenticava e não era
+      encontrada — busca com `success` e zero entradas, senha aceita e login
+      falhando em seguida, sem o usuário chegar a ser criado. Era a causa real
+      de "só o administrador entra". O `username` gravado no Django é sempre o
+      `sAMAccountName` real, e o `ldap_check` mostra os dois identificadores e
+      avisa quando divergem
+- [x] `ldap_check --user <conta> --list` passou a rodar **mesmo quando a conta
+      do `--user` não é encontrada**: o bind passou, a credencial serve para
+      consultar, e é nesse caso que a listagem resolve a dúvida
+- [x] 81 testes novos — suíte total: **374 testes**
 
 **Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
 

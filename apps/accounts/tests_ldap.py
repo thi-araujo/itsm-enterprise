@@ -452,6 +452,17 @@ def _conexao_falsa():
         'sAMAccountName': 'joao.paulo',
         'displayName':    'João Paulo Souza',
     })
+    # Conta cujo `sAMAccountName` **não** é o prefixo do UPN. No AD os dois
+    # são campos independentes, e foi o que apareceu no domínio deste projeto:
+    # a pessoa digita `lara`, o bind é validado contra o UPN e passa, e uma
+    # busca só por `sAMAccountName=lara` não acharia nada.
+    conexao.strategy.add_entry(f'CN=Lara Souza,OU=Usuarios,{BASE}', {
+        'objectClass':       ['top', 'person', 'user'],
+        'sAMAccountName':    'lara.souza',
+        'userPrincipalName': 'lara@exemplo.local',
+        'givenName':         'Lara',
+        'sn':                'Souza',
+    })
     # Conta de computador: no AD ela também tem `objectClass=user` e
     # apareceria na listagem se o filtro não a excluísse.
     conexao.strategy.add_entry(f'CN=PC-EXEMPLO-01,OU=Computadores,{BASE}', {
@@ -521,6 +532,38 @@ class ClienteLdapComServidorFalsoTests(TestCase):
         self.assertEqual(dados.first_name, 'João')
         self.assertEqual(dados.last_name, 'Silva')
 
+    @override_settings(LDAP_DOMAIN='exemplo.local')
+    def test_conta_e_achada_pelo_upn_quando_o_nome_curto_difere(self):
+        """A pessoa digita `lara`, mas o `sAMAccountName` é `lara.souza`.
+
+        O bind simples do AD é validado contra o `userPrincipalName`, então
+        essa conta autentica. Procurar só por `sAMAccountName=lara` devolvia
+        busca bem-sucedida e nenhuma entrada — a senha era aceita e o login
+        falhava em seguida, sem o usuário nunca chegar a ser criado no ITSM.
+        """
+        dados = autenticar('lara', 'senha')
+
+        self.assertIsNotNone(dados, 'a conta deveria ser achada pelo UPN')
+        # O username gravado no Django é o `sAMAccountName` real, não o que
+        # foi digitado: é o identificador estável da conta no domínio.
+        self.assertEqual(dados.username, 'lara.souza')
+        self.assertEqual(dados.first_name, 'Lara')
+
+    @override_settings(LDAP_DOMAIN='exemplo.local')
+    def test_digitar_o_upn_completo_tambem_acha(self):
+        """`lara@exemplo.local` é uma das formas válidas no Windows."""
+        dados = autenticar('lara@exemplo.local', 'senha')
+        self.assertIsNotNone(dados)
+        self.assertEqual(dados.username, 'lara.souza')
+
+    @override_settings(LDAP_DOMAIN='exemplo.local')
+    def test_o_nome_curto_continua_achando_quem_bate_pelos_dois(self):
+        """A conta normal, em que `sAMAccountName` é o prefixo do UPN, não
+        pode ter deixado de ser encontrada pela mudança do filtro."""
+        dados = autenticar('joao', 'senha')
+        self.assertIsNotNone(dados)
+        self.assertEqual(dados.username, 'joao')
+
     def test_conta_fora_da_base_de_busca_nao_e_encontrada(self):
         """Bind aceito e busca vazia não é "senha errada" — é configuração
         errada. De qualquer forma o login não passa."""
@@ -552,7 +595,7 @@ class ListagemDeUsuariosTests(TestCase):
         from .ldap_client import listar_usuarios
         contas = listar_usuarios('joao', 'senha')
         self.assertEqual([c.username for c in contas],
-                         ['joao', 'joao.paulo', 'maria.santos'])
+                         ['joao', 'joao.paulo', 'lara.souza', 'maria.santos'])
 
     def test_conta_de_computador_fica_fora_da_lista(self):
         """No AD a máquina também tem `objectClass=user`; sem o filtro, a
@@ -724,6 +767,24 @@ class DomainUsersAbreChamadoTests(TestCase):
         self.assertEqual(user.profile.role, UserProfile.ROLE_REQUESTER,
                          'se isto falhar, o rebaixamento deixou de acontecer '
                          'e o aviso no settings pode ser revisto')
+
+
+class NomeCurtoTests(TestCase):
+    """`_nome_curto` — tirar o domínio do que a pessoa digitou.
+
+    As três formas abaixo funcionam no logon do Windows, então todas chegam à
+    tela de login do ITSM. O `sAMAccountName` é só a parte curta.
+    """
+
+    def test_as_tres_formas_de_digitar(self):
+        from .ldap_client import _nome_curto
+        for digitado in ['lara', 'lara@araujo.corp', 'ARAUJO\\lara']:
+            with self.subTest(digitado=digitado):
+                self.assertEqual(_nome_curto(digitado), 'lara')
+
+    def test_ponto_no_nome_e_preservado(self):
+        from .ldap_client import _nome_curto
+        self.assertEqual(_nome_curto('lara.souza@araujo.corp'), 'lara.souza')
 
 
 class MotivoDaRecusaTests(TestCase):

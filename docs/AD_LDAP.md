@@ -278,27 +278,75 @@ senha dela já foi usada e trocada.
 ### 2. A senha foi aceita, mas a conta não apareceu na busca
 
 ```
-[erro]  a senha de maria.souza foi aceita, mas a conta não apareceu na busca.
+[erro]  a senha de lara foi aceita, mas a conta não apareceu na busca.
         Base consultada....... DC=exemplo,DC=local
-        Resposta da busca..... insufficientAccessRights
+        Resposta da busca..... success
 ```
 
-O bind passou — a senha está certa. O que falhou foi **ler o diretório**. Por
-padrão o ITSM lê os atributos com a conexão do próprio usuário, e um usuário
-de domínio comum tem permissão de leitura; se o seu AD restringe isso, só quem
-é administrador consegue ler, e o sintoma é exatamente "só o admin entra".
+O bind passou — a senha está certa. O que falhou foi **encontrar o objeto da
+conta** para ler os atributos. A linha "Resposta da busca" separa três casos
+bem diferentes:
 
-A saída é uma conta de serviço, que passa a fazer **a leitura** (o bind de
-senha continua sendo feito com a credencial de quem está entrando):
+| Resposta | Significado | Conserto |
+|---|---|---|
+| `success` | a busca funcionou e não achou ninguém | o filtro não casou — ver abaixo |
+| `insufficientAccessRights` | sem permissão de leitura | conta de serviço |
+| `noSuchObject` | a base não existe no servidor | ajustar `ITSM_LDAP_SEARCH_BASE` |
+
+**`success` com zero entradas é o caso mais traiçoeiro**, porque a base está
+certa e a leitura é permitida: o que não bateu foi o nome. No AD o
+`sAMAccountName` (nome curto, o "logon pré-Windows 2000") e o
+`userPrincipalName` são **campos independentes**, e o bind simples é validado
+contra o **UPN**. Então uma conta assim:
+
+| Campo no AD | Valor |
+|---|---|
+| `userPrincipalName` | `lara@exemplo.local` |
+| `sAMAccountName` | `lara.souza` |
+
+autentica quando a pessoa digita `lara` — e uma busca por
+`sAMAccountName=lara` não acha nada. A senha é aceita e o login falha logo
+depois, sem o usuário nunca chegar a ser criado no ITSM.
+
+É por isso que o filtro padrão procura pelos **dois**:
+
+```python
+LDAP_USER_FILTER = ('(&(objectClass=user)'
+                    '(|(sAMAccountName={username})(userPrincipalName={upn})))')
+```
+
+O `{username}` recebe o nome curto (`lara`, já sem o domínio, nas três formas
+`lara`, `lara@exemplo.local` e `DOMINIO\lara`) e o `{upn}` recebe o UPN
+completo usado no bind. Quem é gravado como `username` no Django é sempre o
+**`sAMAccountName` real** — `lara.souza` no exemplo —, porque é o
+identificador estável da conta no domínio.
+
+Para ver o nome curto real de cada conta do diretório:
+
+```powershell
+python manage.py ldap_check --user <conta> --list
+```
+
+Essa listagem roda **mesmo quando a conta do `--user` não foi encontrada**: o
+bind passou, então a credencial serve para consultar, e é justamente aí que
+ela resolve a dúvida. O `--user` sem `--list` também avisa quando os dois
+identificadores divergem:
+
+```
+  sAMAccountName.............. lara.souza
+  userPrincipalName........... lara@exemplo.local
+  [aviso] o nome curto (lara.souza) é diferente do prefixo do UPN (lara).
+          O ITSM grava o nome curto como username.
+```
+
+No caso de `insufficientAccessRights`, a saída é uma conta de serviço, que
+passa a fazer **a leitura** (o bind de senha continua sendo feito com a
+credencial de quem está entrando):
 
 ```powershell
 $env:ITSM_LDAP_BIND_DN       = "CN=svc-itsm,OU=Servicos,DC=exemplo,DC=local"
 $env:ITSM_LDAP_BIND_PASSWORD = "<senha da conta de servico>"
 ```
-
-Se a resposta for `noSuchObject` ou `sem resultado` em vez de
-`insufficientAccessRights`, a conta está **fora** de `LDAP_SEARCH_BASE` —
-outra OU ou outro domínio — e o conserto é ajustar `ITSM_LDAP_SEARCH_BASE`.
 
 ### 3. A conta está inativa no ITSM
 
@@ -446,7 +494,7 @@ O `ldap_check --user` avisa quando a conta está sem eles:
 
 ## Testes
 
-76 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
+81 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
 estratégias:
 
 1. A maioria substitui `ldap_backend.autenticar` por uma função falsa e

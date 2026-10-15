@@ -32,6 +32,12 @@ class Command(BaseCommand):
     # credencial digitada no teste de bind, em vez de pedir duas vezes.
     _senha = ''
 
+    # O bind foi aceito, mesmo que a conta não tenha sido encontrada depois.
+    # É o que permite o --list rodar justamente no caso em que ele é mais
+    # útil: a credencial serve para consultar, e a listagem mostra o nome
+    # curto real das contas.
+    _bind_ok = False
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--user',
@@ -65,6 +71,11 @@ class Command(BaseCommand):
             return
 
         if not self._testar_autenticacao(username):
+            if opcoes.get('list') and self._bind_ok:
+                # A conta não foi encontrada, mas o bind passou — e é
+                # exatamente aqui que a listagem resolve a dúvida, mostrando
+                # o `sAMAccountName` real de cada conta do diretório.
+                self._listar(username)
             return
 
         if opcoes.get('list'):
@@ -101,15 +112,35 @@ class Command(BaseCommand):
             self._item('Resposta da busca', relatorio.get('busca', '—'))
             if relatorio.get('busca_mensagem'):
                 self._item('Detalhe', relatorio['busca_mensagem'])
-            self.stdout.write(
-                '\n  Duas causas possíveis, e a resposta acima distingue:\n'
-                '    • a conta está fora de LDAP_SEARCH_BASE (outra OU ou\n'
-                '      outro domínio) → ajuste ITSM_LDAP_SEARCH_BASE;\n'
-                '    • a conta não tem permissão de ler o diretório → use uma\n'
-                '      conta de serviço em ITSM_LDAP_BIND_DN /\n'
-                '      ITSM_LDAP_BIND_PASSWORD (ver docs/AD_LDAP.md).\n'
-                '\n  Se o administrador entra e o usuário comum não, é o '
-                'segundo caso.')
+            resposta = (relatorio.get('busca') or '').lower()
+            if resposta.startswith('insufficientaccess'):
+                self.stdout.write(
+                    '\n  A busca foi barrada por permissão: esta conta não '
+                    'pode ler o\n  diretório. Use uma conta de serviço só '
+                    'para a leitura:\n'
+                    '    $env:ITSM_LDAP_BIND_DN       = '
+                    '"CN=svc-itsm,OU=Servicos,' + settings.LDAP_SEARCH_BASE
+                    + '"\n'
+                    '    $env:ITSM_LDAP_BIND_PASSWORD = "<senha>"')
+            elif resposta.startswith('nosuchobject'):
+                self.stdout.write(
+                    '\n  A base de busca não existe no servidor. Compare '
+                    'LDAP_SEARCH_BASE com\n  os naming contexts listados '
+                    'acima e ajuste ITSM_LDAP_SEARCH_BASE.')
+            else:
+                # Busca bem-sucedida e nenhuma entrada: a base está certa e a
+                # leitura é permitida. O que não casou foi o filtro.
+                self.stdout.write(
+                    '\n  A busca funcionou e não encontrou ninguém — então a '
+                    'base está correta\n  e a leitura é permitida. O que não '
+                    'casou foi o filtro de procura.\n'
+                    '\n  No AD o `sAMAccountName` (nome curto) e o '
+                    '`userPrincipalName` são campos\n  independentes, e o bind '
+                    'é validado contra o UPN. Ou seja: a senha de\n'
+                    f'  {username}@{settings.LDAP_DOMAIN} foi aceita, mas '
+                    f'nenhuma conta tem\n  sAMAccountName={username}.\n'
+                    '\n  Veja o nome curto real de cada conta com:\n'
+                    f'    python manage.py ldap_check --user {username} --list')
             return
 
         motivo = relatorio.get('motivo')
@@ -237,12 +268,24 @@ class Command(BaseCommand):
             return False
 
         if dados is None:
+            # `fora_da_base` significa que o bind passou: a senha está certa e
+            # a credencial serve para consultar o diretório.
+            self._bind_ok = bool(relatorio.get('fora_da_base'))
             self._explicar_recusa(username, relatorio)
             return False
+
+        self._bind_ok = True
 
         self._ok('bind aceito pelo AD')
         self._titulo('Dados lidos do diretório')
         self._item('sAMAccountName', dados.username)
+        # Os dois identificadores lado a lado de propósito: o bind é validado
+        # contra o UPN e a busca casa pelo nome curto, e eles podem diferir.
+        self._item('userPrincipalName', dados.upn or '(vazio)')
+        if dados.upn and dados.upn.split('@')[0] != dados.username:
+            self._aviso(f'o nome curto ({dados.username}) é diferente do '
+                        f'prefixo do UPN ({dados.upn.split("@")[0]}). O ITSM '
+                        f'grava o nome curto como username.')
         self._item('Nome', f'{dados.first_name} {dados.last_name}'.strip() or '(vazio)')
         self._item('E-mail', dados.email or '(vazio)')
         self._item('Departamento', dados.department or '(vazio)')
