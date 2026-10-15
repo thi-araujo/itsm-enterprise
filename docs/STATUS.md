@@ -494,3 +494,68 @@ conta demitida exigiria rotina periódica, como o `check_sla`.
 - A aprovação por departamento (pendência da Fase 3.3) ficou **mais perto**:
   o `UserProfile.department` agora é preenchido pelo diretório, que era o
   dado que faltava.
+
+### ✅ 3.9 — E-mail: SMTP configurável e recibo de abertura — Concluída
+
+Veio de um sintoma relatado: um chamado foi aberto por uma conta do AD com
+e-mail preenchido e nenhuma mensagem chegou. **Eram duas causas
+independentes**, e trocar o servidor de e-mail resolveria só a primeira.
+
+- [x] **Causa 1 — o backend era o console.** `EMAIL_BACKEND` estava cravado
+      em `console.EmailBackend`: as mensagens eram impressas no terminal do
+      `runserver` e nada saía da máquina, para nenhum usuário. Agora o SMTP é
+      configurável por `ITSM_EMAIL_*` no `.env`, e o console **continua sendo
+      o padrão** — quem clona o projeto não precisa de servidor de e-mail, e
+      ninguém dispara e-mail de verdade sem querer enquanto testa
+- [x] **Causa 2 — o solicitante não era destinatário na abertura.** O
+      `notify_ticket_created` vai só para `_equipe()` (técnicos, gerentes e
+      admins). Quem abriu o chamado não recebia nada; a primeira mensagem só
+      chegava no primeiro comentário público ou na resolução. No caso
+      relatado a conta aparecia na lista por ser **Administradora** (veio do
+      `Domain Admins`), não por ser a solicitante — um Solicitante puro não
+      receberia nada nem com SMTP configurado
+- [x] `notify_ticket_opened` — recibo para quem abriu, com número, tipo,
+      prioridade e prazo. **Função separada** do aviso da equipe de propósito:
+      são públicos e textos diferentes (ordem de serviço × comprovante)
+- [x] Chamado que exige aprovação **não promete prazo**: o SLA só começa na
+      decisão (Fase 3.3), então o texto diz que o pedido foi encaminhado ao
+      gestor. Mostrar "—" pareceria defeito e mostrar um prazo seria mentira
+- [x] O recibo **não** gera notificação do sino: a pessoa acabou de clicar em
+      criar e está vendo o chamado. O valor do e-mail é o comprovante com o
+      número, na caixa de entrada
+- [x] Chamado aberto pela **tela** e pela **API** enviam a confirmação, com um
+      teste para cada ponto de criação — a função existir não garante que ela
+      é chamada, e são dois call sites
+- [x] `EMAIL_TIMEOUT` com padrão de 10s: o envio é síncrono, dentro da
+      requisição, e um SMTP que aceita a conexão e não responde penduraria a
+      tela de quem está abrindo o chamado
+- [x] `DEFAULT_FROM_EMAIL` cai na própria conta do SMTP quando
+      `ITSM_EMAIL_FROM` está vazio — Microsoft 365 e Gmail recusam remetente
+      que não seja a caixa autenticada
+- [x] `apps/notifications/checks.py` — 5 verificações no `manage.py check`
+      (`email.W001`..`W004` e `email.E001`). O `_send_email` registra a falha
+      e segue, o que é a decisão certa (criar chamado não pode depender do
+      SMTP), mas **faz do silêncio o sintoma** de configuração errada; os
+      avisos compensam isso. As checagens de SMTP não rodam com backend de
+      teste, senão todo `manage.py test` imprimiria aviso falso
+- [x] `docs/EMAIL.md` com a tabela de quem recebe o quê, a configuração dos
+      três provedores e o `manage.py sendtestemail` para diagnosticar
+- [x] 13 testes novos — suíte total: **387 testes**
+
+**Verificado:** o recibo do chamado #0015 renderizado com o endereço real da
+conta do AD, com prazo correto (16/10/2026 02:24); `manage.py check` emitindo
+`email.W001` em modo console e nada durante os testes.
+
+> ⚠️ **Prazo da Microsoft.** A autenticação básica no SMTP (usuário e senha, o
+> que o backend do Django faz) está em retirada no Exchange Online — adiada
+> para o **fim de dezembro de 2026**, com remoção definitiva a ser anunciada
+> no segundo semestre de 2027. Quando valer, o sintoma é
+> `550 5.7.30 Basic authentication is not supported for Client Submission` e a
+> saída exige OAuth2, conector de retransmissão ou Graph API. Ver
+> `docs/EMAIL.md`.
+
+### Pendência desta fase
+- O envio é **síncrono**, dentro da requisição. Em volume maior o caminho é
+  Celery, chamando as mesmas funções de `email.py`.
+- Os links no corpo das mensagens estão cravados em `http://localhost:8000`.
+  Em uso real precisam virar o endereço do servidor.

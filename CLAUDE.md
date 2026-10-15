@@ -13,6 +13,7 @@ Mantenha-o curto e atualizado. Detalhes longos ficam em `docs/`.
 - **Automações de SLA e agendamento:** ver @docs/AUTOMACAO_SLA.md
 - **API REST:** ver @docs/API.md
 - **Integração AD/LDAP:** ver @docs/AD_LDAP.md
+- **E-mail (quem recebe o quê, SMTP):** ver @docs/EMAIL.md
 
 ## Regras obrigatórias
 1. O nome do sistema é **ITSM Enterprise**. A palavra "RAVEN" (e variações `raven`, `Raven`) NÃO deve existir em nenhum arquivo, classe CSS, variável, template, e-mail ou comentário.
@@ -37,6 +38,7 @@ python manage.py check_sla                  # automações de SLA (aviso, vencim
 python manage.py check_sla --dry-run        # mostra o que faria, sem gravar
 python manage.py ldap_check                 # diagnóstico da conexão com o AD
 python manage.py ldap_check --user joao.silva   # testa o login e lista os grupos
+python manage.py sendtestemail voce@exemplo.com  # confere o envio de e-mail
 python manage.py createsuperuser            # criar admin
 ```
 

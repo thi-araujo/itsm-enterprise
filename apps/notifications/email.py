@@ -74,6 +74,57 @@ def notify_ticket_created(ticket):
         )
 
 
+def notify_ticket_opened(ticket):
+    """Confirma a abertura para **quem abriu** o chamado.
+
+    Separado do `notify_ticket_created`, que avisa a equipe: são públicos
+    diferentes e o texto é diferente. O da equipe é uma ordem de serviço
+    ("chegou um chamado, com a descrição inteira"); este é um recibo ("seu
+    chamado foi registrado com o número X, o prazo é Y").
+
+    Não gera notificação do sino: a pessoa acabou de clicar em "criar" e está
+    vendo o chamado na tela. O valor do e-mail é ser um comprovante com o
+    número, que ela guarda na caixa de entrada.
+    """
+    if not ticket.requester.email:
+        return
+
+    nome = ticket.requester.get_full_name() or ticket.requester.username
+    subject = f"[ITSM Enterprise] Chamado #{ticket.pk:04d} registrado"
+    body = (
+        f"Olá, {nome}!\n\n"
+        f"Recebemos o seu chamado. Guarde o número para acompanhar.\n\n"
+        f"  Número:     #{ticket.pk:04d}\n"
+        f"  Título:     {ticket.title}\n"
+        f"  Tipo:       {ticket.get_ticket_type_display()}\n"
+        f"  Prioridade: {ticket.get_priority_display()}\n"
+    )
+
+    # Chamado de categoria que exige aprovação nasce sem prazo: o SLA só
+    # começa a contar quando o gestor aprova (Fase 3.3). Mostrar "—" aqui
+    # pareceria defeito, e mostrar um prazo seria mentira.
+    if ticket.is_awaiting_approval:
+        body += (
+            "\nO seu pedido foi encaminhado para aprovação do gestor. "
+            "Você receberá\num aviso com a decisão, e o prazo de atendimento "
+            "começa a contar a\npartir da aprovação.\n"
+        )
+    elif ticket.sla_deadline:
+        body += (
+            f"\nPrazo de atendimento: até "
+            f"{ticket.sla_deadline.strftime('%d/%m/%Y às %H:%M')}.\n"
+        )
+
+    body += (
+        f"\nVocê será avisado por e-mail quando houver resposta ou quando o "
+        f"chamado\nfor resolvido. Para acrescentar informações, comente no "
+        f"próprio chamado.\n\n"
+        f"Acompanhe: http://localhost:8000/tickets/{ticket.pk}/\n\n"
+        f"— ITSM Enterprise"
+    )
+    _send_email(subject, body, [ticket.requester.email])
+
+
 def notify_ticket_assigned(ticket):
     if not ticket.assignee:
         return

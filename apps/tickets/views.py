@@ -174,13 +174,17 @@ def ticket_create(request):
 
             try:
                 from apps.notifications.email import (notify_approval_requested,
-                                                      notify_ticket_created)
+                                                      notify_ticket_created,
+                                                      notify_ticket_opened)
                 # Enquanto não houver aprovação não há nada que um técnico
                 # possa fazer, então o aviso vai para quem decide.
                 if precisa_aprovacao:
                     notify_approval_requested(ticket)
                 else:
                     notify_ticket_created(ticket)
+                # Recibo para quem abriu, nos dois casos — ele precisa do
+                # número do chamado independentemente de quem foi avisado.
+                notify_ticket_opened(ticket)
             except Exception:
                 logger.exception('Falha ao notificar criação do ticket #%s', ticket.pk)
 

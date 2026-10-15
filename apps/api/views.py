@@ -120,10 +120,14 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.save_as(request.user)
 
         from apps.notifications.email import (notify_approval_requested,
-                                              notify_ticket_created)
+                                              notify_ticket_created,
+                                              notify_ticket_opened)
         services._notificar(
             notify_approval_requested if precisa_aprovacao else notify_ticket_created,
             ticket, acao=f'criação do ticket #{ticket.pk}')
+        # Recibo para quem abriu, nos dois casos — a mesma regra da tela.
+        services._notificar(notify_ticket_opened, ticket,
+                            acao=f'confirmação do ticket #{ticket.pk}')
 
         saida = TicketSerializer(ticket, context=self.get_serializer_context())
         return Response(saida.data, status=status.HTTP_201_CREATED)

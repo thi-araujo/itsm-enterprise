@@ -335,6 +335,42 @@ LOGGING = {
     },
 }
 
-# E-mail: em desenvolvimento, as mensagens aparecem no console.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'itsm-enterprise@exemplo.local'
+# ─────────────────────────────────────────────────────────────────────
+# E-mail
+#
+# Sem `ITSM_EMAIL_HOST` definido, o backend é o **console**: as mensagens são
+# impressas no terminal do `runserver` e nada sai da máquina. É o padrão de
+# propósito — quem clona o projeto não precisa de um servidor de SMTP para
+# abrir chamados, e ninguém dispara e-mail de verdade sem querer enquanto
+# testa.
+#
+# Definir o host liga o SMTP de verdade. Configuração por provedor em
+# docs/EMAIL.md.
+# ─────────────────────────────────────────────────────────────────────
+EMAIL_HOST = os.environ.get('ITSM_EMAIL_HOST', '')
+
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = int(os.environ.get('ITSM_EMAIL_PORT', '587'))
+    EMAIL_HOST_USER = os.environ.get('ITSM_EMAIL_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('ITSM_EMAIL_PASSWORD', '')
+    # 587 usa STARTTLS; 465 é TLS desde o primeiro byte. Os dois ao mesmo
+    # tempo são incompatíveis — há um check que recusa essa combinação.
+    EMAIL_USE_TLS = _env_bool('ITSM_EMAIL_USE_TLS', EMAIL_PORT != 465)
+    EMAIL_USE_SSL = _env_bool('ITSM_EMAIL_USE_SSL', EMAIL_PORT == 465)
+    # Sem timeout, um servidor de SMTP que aceita a conexão e não responde
+    # deixa a requisição pendurada — e quem está abrindo o chamado vê a tela
+    # travada. O envio é síncrono, dentro do ciclo da requisição.
+    EMAIL_TIMEOUT = int(os.environ.get('ITSM_EMAIL_TIMEOUT', '10'))
+    # Microsoft 365 e Gmail recusam mensagem cujo remetente não seja a caixa
+    # autenticada, então o padrão é a própria conta do SMTP.
+    DEFAULT_FROM_EMAIL = (os.environ.get('ITSM_EMAIL_FROM')
+                          or EMAIL_HOST_USER
+                          or 'itsm-enterprise@exemplo.local')
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = os.environ.get('ITSM_EMAIL_FROM',
+                                        'itsm-enterprise@exemplo.local')
+
+# Endereço que aparece como remetente dos erros do Django (500) em produção.
+SERVER_EMAIL = DEFAULT_FROM_EMAIL

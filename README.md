@@ -11,7 +11,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 ![DRF](https://img.shields.io/badge/DRF-3.18-A30000)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
 ![HTMX](https://img.shields.io/badge/HTMX-1.9-3366CC)
-![Testes](https://img.shields.io/badge/testes-374%20passando-brightgreen)
+![Testes](https://img.shields.io/badge/testes-387%20passando-brightgreen)
 
 ---
 
@@ -39,7 +39,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 |---|---|
 | **Domínio** | ITSM / Service Desk corporativo |
 | **Código** | ~10.100 linhas de Python versionadas |
-| **Testes** | 374 automatizados, sem dependência de rede |
+| **Testes** | 387 automatizados, sem dependência de rede |
 | **Models** | 11 (chamado, comentário, anexo, escalonamento, aprovação, auditoria, ativo, notificação, perfil…) |
 | **Apps** | 7 (`accounts`, `tickets`, `cmdb`, `notifications`, `reports`, `dashboard`, `api`) |
 | **Autenticação** | sessão, token (API) e **Active Directory** via LDAP |
@@ -321,7 +321,7 @@ python manage.py test apps.tickets           # um app
 python manage.py test apps.accounts.tests_ldap
 ```
 
-**374 testes, nenhum dependendo de rede ou de serviço externo.**
+**387 testes, nenhum dependendo de rede ou de serviço externo.**
 
 | Módulo | Testes | Cobre |
 |---|---:|---|
@@ -334,7 +334,8 @@ python manage.py test apps.accounts.tests_ldap
 | `tickets` (automação) | 41 | aviso, vencimento, balanceamento |
 | `tickets` (estatísticas) | 32 | agregações, N+1 |
 | `api` | 60 | permissões, serializers, ações |
-| `cmdb` · `notifications` · `reports` · `dashboard` | 23 | — |
+| `notifications` | 21 | destinatários, recibo de abertura, falha de SMTP |
+| `cmdb` · `reports` · `dashboard` | 15 | — |
 
 Alguns testes existem para **travar decisões**, não só para verificar código:
 que o volume diário não volte a fazer uma consulta por dia
@@ -379,6 +380,7 @@ itsm_enterprise/
 | [`docs/API.md`](docs/API.md) | endpoints, filtros, exemplos, erros |
 | [`docs/AD_LDAP.md`](docs/AD_LDAP.md) | integração com o Active Directory |
 | [`docs/AUTOMACAO_SLA.md`](docs/AUTOMACAO_SLA.md) | automações e agendamento |
+| [`docs/EMAIL.md`](docs/EMAIL.md) | quem recebe o quê, e configuração do SMTP |
 | [`docs/STATUS.md`](docs/STATUS.md) | o que foi entregue em cada fase, com as decisões |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | plano de evolução |
 | [`SETUP.md`](SETUP.md) | guia de instalação detalhado |
