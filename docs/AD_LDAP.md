@@ -177,8 +177,15 @@ primário de toda conta do AD — o diretório a coloca lá na criação, e não
 para tirar —, "quem está em `Domain Users`" e "todo mundo que tem conta no
 domínio" são o mesmo conjunto de pessoas.
 
-Acrescentar `('Domain Users', 'requester')` ao mapa parece dizer a mesma
-coisa, e **quebraria o passo 3 do fluxo acima.** Com o grupo no mapa, toda
+Acrescentar `('Domain Users', 'requester')` ao mapa **não funcionaria**, por um
+detalhe do AD: o grupo primário fica em `primaryGroupID` e **não** é listado em
+`memberOf`. A conta que está só em `Domain Users` chega ao ITSM sem grupo
+nenhum, então a linha do mapa nunca casaria — e o papel continuaria vindo do
+`LDAP_DEFAULT_ROLE`, como já vem.
+
+Pior: nos casos em que o grupo **chega** na lista (com `LDAP_NESTED_GROUPS`
+ligado, ou se alguém o tiver adicionado como membro secundário), a linha
+**quebraria o passo 3 do fluxo acima.** Com o grupo no mapa, toda
 conta passa a casar; casar faz o diretório sobrescrever o papel; e o Técnico
 promovido à mão em /admin/ voltaria a Solicitante no login seguinte. O ajuste
 manual deixaria de ser durável — e o sintoma apareceria dias depois, como
@@ -225,6 +232,84 @@ python manage.py runserver 0.0.0.0:8000
 Para ligar de forma permanente, troque o padrão no `settings.py` ou defina a
 variável no ambiente do serviço. Com o LDAP ligado, a tela de login passa a
 avisar "Use seu usuário e senha de rede do domínio exemplo.local".
+
+## Quando só o administrador consegue entrar
+
+Sintoma clássico: a conta de quem administra o domínio entra, e as contas de
+usuário comum são recusadas. **Não é o papel nem o mapa de grupos** — quem é
+recusado não chegou a ser criado no ITSM. São três causas possíveis, e o
+`ldap_check --user` separa as três:
+
+```powershell
+python manage.py ldap_check --user <conta.comum>
+```
+
+### 1. O AD recusou o bind
+
+```
+[erro]  o AD recusou o bind de maria.souza: precisa trocar a senha no
+        próximo logon (data 773)
+```
+
+O LDAP recusa **todo** bind com o mesmo código (`invalidCredentials`), de
+propósito: contar a diferença ajudaria quem está tentando adivinhar contas. O
+motivo real vem escondido no texto de diagnóstico, no campo `data`, e o
+comando o decodifica:
+
+| `data` | Significado | O que fazer |
+|---|---|---|
+| `52e` | senha incorreta | a conta está em ordem; a senha não confere |
+| `773` | **precisa trocar a senha no próximo logon** | ver abaixo |
+| `532` | senha expirada | trocar a senha no domínio |
+| `533` | conta desabilitada | reativar no console do AD |
+| `775` | conta bloqueada | desbloquear ou aguardar |
+| `525` | conta não encontrada | conferir o `sAMAccountName` |
+| `530` / `531` | restrição de horário / de estação | `logonHours` / `userWorkstations` |
+| `701` | conta expirada | a data de expiração passou |
+
+**O `773` é o mais comum e o que mais engana**, porque é o estado *padrão* de
+toda conta recém-criada: o console do AD marca "O usuário deve alterar a senha
+no próximo logon" por default. A credencial está perfeita, e a conta **nunca
+entra** — um bind LDAP simples não tem como trocar senha. A pessoa precisa
+trocar a senha uma vez no Windows (Ctrl+Alt+Del → Alterar senha), ou você
+desmarca a caixa no console. A conta do administrador não cai nisso porque a
+senha dela já foi usada e trocada.
+
+### 2. A senha foi aceita, mas a conta não apareceu na busca
+
+```
+[erro]  a senha de maria.souza foi aceita, mas a conta não apareceu na busca.
+        Base consultada....... DC=exemplo,DC=local
+        Resposta da busca..... insufficientAccessRights
+```
+
+O bind passou — a senha está certa. O que falhou foi **ler o diretório**. Por
+padrão o ITSM lê os atributos com a conexão do próprio usuário, e um usuário
+de domínio comum tem permissão de leitura; se o seu AD restringe isso, só quem
+é administrador consegue ler, e o sintoma é exatamente "só o admin entra".
+
+A saída é uma conta de serviço, que passa a fazer **a leitura** (o bind de
+senha continua sendo feito com a credencial de quem está entrando):
+
+```powershell
+$env:ITSM_LDAP_BIND_DN       = "CN=svc-itsm,OU=Servicos,DC=exemplo,DC=local"
+$env:ITSM_LDAP_BIND_PASSWORD = "<senha da conta de servico>"
+```
+
+Se a resposta for `noSuchObject` ou `sem resultado` em vez de
+`insufficientAccessRights`, a conta está **fora** de `LDAP_SEARCH_BASE` —
+outra OU ou outro domínio — e o conserto é ajustar `ITSM_LDAP_SEARCH_BASE`.
+
+### 3. A conta está inativa no ITSM
+
+Autentica no AD e o login é recusado assim mesmo, com esta linha no log:
+
+```
+[INFO] LDAP: maria.souza autenticou no AD mas está inativo no ITSM.
+```
+
+Alguém desmarcou "Ativo" em /admin/ → Usuários. É proposital: desativar no
+Django tranca a conta mesmo com a senha certa no domínio.
 
 ## Todas as configurações
 
@@ -361,7 +446,7 @@ O `ldap_check --user` avisa quando a conta está sem eles:
 
 ## Testes
 
-67 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
+76 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
 estratégias:
 
 1. A maioria substitui `ldap_backend.autenticar` por uma função falsa e

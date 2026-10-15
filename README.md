@@ -11,7 +11,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 ![DRF](https://img.shields.io/badge/DRF-3.18-A30000)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
 ![HTMX](https://img.shields.io/badge/HTMX-1.9-3366CC)
-![Testes](https://img.shields.io/badge/testes-361%20passando-brightgreen)
+![Testes](https://img.shields.io/badge/testes-369%20passando-brightgreen)
 
 ---
 
@@ -39,7 +39,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 |---|---|
 | **Domínio** | ITSM / Service Desk corporativo |
 | **Código** | ~10.100 linhas de Python versionadas |
-| **Testes** | 361 automatizados, sem dependência de rede |
+| **Testes** | 369 automatizados, sem dependência de rede |
 | **Models** | 11 (chamado, comentário, anexo, escalonamento, aprovação, auditoria, ativo, notificação, perfil…) |
 | **Apps** | 7 (`accounts`, `tickets`, `cmdb`, `notifications`, `reports`, `dashboard`, `api`) |
 | **Autenticação** | sessão, token (API) e **Active Directory** via LDAP |
@@ -321,12 +321,12 @@ python manage.py test apps.tickets           # um app
 python manage.py test apps.accounts.tests_ldap
 ```
 
-**361 testes, nenhum dependendo de rede ou de serviço externo.**
+**369 testes, nenhum dependendo de rede ou de serviço externo.**
 
 | Módulo | Testes | Cobre |
 |---|---:|---|
 | `accounts` | 28 | RBAC, visibilidade, perfis |
-| `accounts` (LDAP) | 67 | mapeamento de grupos, provisionamento, cadeia de backends |
+| `accounts` (LDAP) | 76 | mapeamento de grupos, provisionamento, cadeia de backends |
 | `tickets` | 21 | CRUD, SLA, comentários, anexos |
 | `tickets` (fluxo) | 27 | finalizar, escalonar |
 | `tickets` (aprovação) | 34 | workflow, início do SLA |

@@ -635,8 +635,8 @@ class DomainUsersAbreChamadoTests(TestCase):
     e "quem está em Domain Users" são o mesmo conjunto de pessoas.
 
     Isto já é o comportamento do `LDAP_DEFAULT_ROLE`, e estes testes existem
-    para que continue sendo — inclusive o último, que mostra por que o grupo
-    **não** deve ser acrescentado ao `LDAP_GROUP_ROLE_MAP`.
+    para que continue sendo — inclusive os dois últimos, que mostram por que o
+    grupo **não** deve ser acrescentado ao `LDAP_GROUP_ROLE_MAP`.
     """
 
     def test_conta_so_em_domain_users_entra_como_solicitante(self):
@@ -667,12 +667,41 @@ class DomainUsersAbreChamadoTests(TestCase):
                                               password='qualquer')
         self.assertEqual(user.profile.role, UserProfile.ROLE_ADMIN)
 
+    def test_conta_sem_memberof_entra_como_solicitante(self):
+        """A forma **real** da conta comum: sem nenhum grupo em `memberOf`.
+
+        O AD guarda o grupo primário em `primaryGroupID` e **não** o lista em
+        `memberOf`. Quem está só em `Domain Users` chega aqui, portanto, sem
+        grupo nenhum — e é por isso que pôr o grupo no `LDAP_GROUP_ROLE_MAP`
+        não teria efeito: ele nunca apareceria para casar.
+
+        Este teste monta a entrada como o `ldap3` a devolveria, com o atributo
+        ausente, para garantir que a leitura não quebra nem inventa grupo.
+        """
+        from .ldap_client import _montar_usuario
+
+        entrada = {'sAMAccountName': ['maria'], 'givenName': ['Maria'],
+                   'sn': ['Souza'], 'mail': [], 'department': [],
+                   'displayName': []}          # sem a chave 'memberOf'
+        dados = _montar_usuario(
+            entrada, 'CN=Maria Souza,OU=Usuarios,DC=exemplo,DC=local', 'maria')
+        self.assertEqual(dados.groups, [])
+
+        with responder(dados):
+            user = LdapBackend().authenticate(None, username='maria',
+                                              password='qualquer')
+        self.assertIsNotNone(user)
+        self.assertEqual(user.profile.role, UserProfile.ROLE_REQUESTER)
+        self.assertEqual(user.first_name, 'Maria')
+
     def test_domain_users_no_mapa_rebaixaria_o_tecnico_promovido_a_mao(self):
         """A armadilha: por isso o grupo fica fora do `LDAP_GROUP_ROLE_MAP`.
 
-        Com o grupo no mapa, **toda** conta passa a casar, e casar sobrescreve
-        o papel. O Técnico promovido à mão em /admin/ voltaria a Solicitante no
-        login seguinte, e o ajuste manual deixaria de ser durável.
+        Vale quando o grupo **chega** na lista — com `LDAP_NESTED_GROUPS`
+        ligado, ou se alguém o tiver adicionado como membro secundário. Aí
+        toda conta passa a casar, e casar sobrescreve o papel: o Técnico
+        promovido à mão em /admin/ voltaria a Solicitante no login seguinte, e
+        o ajuste manual deixaria de ser durável.
 
         Fora do mapa (como está), ninguém casa, o papel atual é mantido, e a
         conta nova cai no `LDAP_DEFAULT_ROLE` — que já é Solicitante.
@@ -695,6 +724,65 @@ class DomainUsersAbreChamadoTests(TestCase):
         self.assertEqual(user.profile.role, UserProfile.ROLE_REQUESTER,
                          'se isto falhar, o rebaixamento deixou de acontecer '
                          'e o aviso no settings pode ser revisto')
+
+
+class MotivoDaRecusaTests(TestCase):
+    """`_motivo_da_recusa` — traduzir o `data NNN` do AD.
+
+    O AD recusa todo bind com o mesmo código LDAP (`invalidCredentials`), de
+    propósito: contar a diferença ajudaria quem está tentando adivinhar contas.
+    O motivo real vem no texto de diagnóstico, e sem decodificá-lo "senha
+    errada" e "precisa trocar a senha no primeiro logon" são a mesma coisa na
+    tela — sendo que a segunda é o estado padrão de toda conta nova no AD.
+    """
+
+    def _mensagem(self, data):
+        return {'description': 'invalidCredentials',
+                'message': ('80090308: LdapErr: DSID-0C09044E, comment: '
+                            f'AcceptSecurityContext error, data {data}, v4f7c')}
+
+    def test_senha_incorreta(self):
+        from .ldap_client import _motivo_da_recusa
+        motivo, _, codigo = _motivo_da_recusa(self._mensagem('52e'))
+        self.assertEqual(codigo, '52e')
+        self.assertIn('senha incorreta', motivo)
+
+    def test_precisa_trocar_a_senha(self):
+        """O caso que mais engana: a conta está certa e nunca entra."""
+        from .ldap_client import _motivo_da_recusa
+        motivo, acao, codigo = _motivo_da_recusa(self._mensagem('773'))
+        self.assertEqual(codigo, '773')
+        self.assertIn('trocar a senha', motivo)
+        self.assertIn('recém-criada', acao)
+
+    def test_conta_desabilitada(self):
+        from .ldap_client import _motivo_da_recusa
+        motivo, _, codigo = _motivo_da_recusa(self._mensagem('533'))
+        self.assertEqual(codigo, '533')
+        self.assertIn('desabilitada', motivo)
+
+    def test_maiuscula_no_codigo_nao_muda_nada(self):
+        from .ldap_client import _motivo_da_recusa
+        self.assertEqual(_motivo_da_recusa(self._mensagem('52E'))[2], '52e')
+
+    def test_codigo_desconhecido_ainda_informa_o_numero(self):
+        from .ldap_client import _motivo_da_recusa
+        motivo, _, codigo = _motivo_da_recusa(self._mensagem('999'))
+        self.assertEqual(codigo, '999')
+        self.assertIn('999', motivo)
+
+    def test_servidor_que_nao_e_ad_cai_na_descricao_padrao(self):
+        """Perder o detalhe é aceitável; deixar de responder não é."""
+        from .ldap_client import _motivo_da_recusa
+        motivo, acao, codigo = _motivo_da_recusa(
+            {'description': 'invalidCredentials', 'message': ''})
+        self.assertEqual((motivo, acao, codigo),
+                         ('invalidCredentials', '', ''))
+
+    def test_resultado_vazio_nao_quebra(self):
+        from .ldap_client import _motivo_da_recusa
+        self.assertEqual(_motivo_da_recusa(None)[0], 'motivo não informado')
+        self.assertEqual(_motivo_da_recusa({})[0], 'motivo não informado')
 
 
 class DivisaoDoNomeTests(TestCase):

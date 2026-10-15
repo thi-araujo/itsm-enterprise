@@ -430,7 +430,16 @@ total 1 contra 13 da equipe.
       em /admin/ voltaria a Solicitante no login seguinte. 4 testes
       (`DomainUsersAbreChamadoTests`) travam isso, um deles demonstrando o
       rebaixamento que o acréscimo causaria
-- [x] 67 testes novos — suíte total: **361 testes**
+- [x] **Motivo real da recusa do AD** (`MOTIVOS_AD` + `_motivo_da_recusa`): o
+      LDAP recusa todo bind como `invalidCredentials` e esconde a causa no
+      campo `data` do texto de diagnóstico. Sem decodificar, "senha errada" e
+      "precisa trocar a senha no próximo logon" (`data 773` — o estado
+      **padrão** de toda conta nova no AD, que faz a conta nunca entrar) são
+      a mesma mensagem. O `ldap_check --user` agora nomeia a causa e diz o que
+      fazer, e separa isso de "bind aceito mas a conta não apareceu na busca"
+      (base errada × sem permissão de leitura), que era o outro caminho de
+      recusa silenciosa
+- [x] 76 testes novos — suíte total: **369 testes**
 
 **Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
 

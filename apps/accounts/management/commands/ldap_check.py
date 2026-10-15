@@ -87,6 +87,43 @@ class Command(BaseCommand):
     def _item(self, rotulo, valor):
         self.stdout.write(f'  {rotulo:.<28} {valor}')
 
+    def _explicar_recusa(self, username, relatorio):
+        """Diz por que o AD recusou, em vez de pedir que se leia o log.
+
+        São três situações bem diferentes, e o LDAP devolve a mesma coisa nas
+        duas primeiras. Sem separá-las, o conserto é adivinhação.
+        """
+        if relatorio.get('fora_da_base'):
+            # O bind passou: a senha está certa. O que falhou foi a leitura.
+            self._erro(f'a senha de {username} foi aceita, mas a conta não '
+                       f'apareceu na busca.')
+            self._item('Base consultada', settings.LDAP_SEARCH_BASE)
+            self._item('Resposta da busca', relatorio.get('busca', '—'))
+            if relatorio.get('busca_mensagem'):
+                self._item('Detalhe', relatorio['busca_mensagem'])
+            self.stdout.write(
+                '\n  Duas causas possíveis, e a resposta acima distingue:\n'
+                '    • a conta está fora de LDAP_SEARCH_BASE (outra OU ou\n'
+                '      outro domínio) → ajuste ITSM_LDAP_SEARCH_BASE;\n'
+                '    • a conta não tem permissão de ler o diretório → use uma\n'
+                '      conta de serviço em ITSM_LDAP_BIND_DN /\n'
+                '      ITSM_LDAP_BIND_PASSWORD (ver docs/AD_LDAP.md).\n'
+                '\n  Se o administrador entra e o usuário comum não, é o '
+                'segundo caso.')
+            return
+
+        motivo = relatorio.get('motivo')
+        if not motivo:
+            self._erro('credencial recusada; o servidor não explicou o '
+                       'motivo.')
+            return
+
+        codigo = relatorio.get('codigo')
+        self._erro(f'o AD recusou o bind de {username}: {motivo}'
+                   + (f' (data {codigo})' if codigo else ''))
+        if relatorio.get('acao'):
+            self.stdout.write(f'\n  O que fazer: {relatorio["acao"]}')
+
     # ──────────────────────────────────────────────────────────────
 
     def _mostrar_configuracao(self):
@@ -191,15 +228,16 @@ class Command(BaseCommand):
         # Guardada só em memória, para o --list não pedir a senha duas vezes.
         self._senha = senha
 
+        relatorio = {}
         try:
-            dados = ldap_client.autenticar(username, senha)
+            dados = ldap_client.autenticar(username, senha,
+                                           relatorio=relatorio)
         except ldap_client.LdapIndisponivel as erro:
             self._erro(f'servidor indisponível: {erro}')
             return False
 
         if dados is None:
-            self._erro('credencial recusada, ou a conta não está dentro de '
-                       'LDAP_SEARCH_BASE. Veja o log acima para distinguir.')
+            self._explicar_recusa(username, relatorio)
             return False
 
         self._ok('bind aceito pelo AD')

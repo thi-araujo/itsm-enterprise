@@ -69,6 +69,70 @@ ATRIBUTOS = ['sAMAccountName', 'givenName', 'sn', 'mail', 'department',
 # grupo de técnicos ficaria de fora.
 REGRA_GRUPOS_ANINHADOS = '1.2.840.113556.1.4.1941'
 
+# Por que este mapa existe
+# ------------------------
+# Quando o AD recusa um bind, o código LDAP padrão é sempre o mesmo —
+# `invalidCredentials` (49) — para não contar a um atacante se a conta existe.
+# O motivo real vai escondido no texto de diagnóstico:
+#
+#   80090308: LdapErr: DSID-0C09044E, comment: AcceptSecurityContext error,
+#   data 773, v4f7c
+#                 ↑ aqui
+#
+# Sem decodificar esse `data`, "a senha está errada" e "a conta precisa trocar
+# a senha no primeiro logon" são indistinguíveis — e a segunda é o estado
+# normal de toda conta recém-criada no AD, porque o console marca
+# "O usuário deve alterar a senha no próximo logon" por padrão.
+MOTIVOS_AD = {
+    '525': ('conta não encontrada no diretório',
+            'confira o sAMAccountName; o UPN do bind usa LDAP_DOMAIN.'),
+    '52e': ('senha incorreta',
+            'a conta existe e está em ordem: a senha digitada não confere.'),
+    '530': ('fora do horário de logon permitido',
+            'restrição de horário no objeto da conta (logonHours).'),
+    '531': ('não autorizada a entrar nesta estação',
+            'a conta tem restrição "Fazer logon em" (userWorkstations); o '
+            'servidor do ITSM precisa estar na lista.'),
+    '532': ('senha expirada',
+            'a pessoa precisa trocar a senha no domínio.'),
+    '533': ('conta desabilitada no AD',
+            'reative em Usuários e Computadores do Active Directory.'),
+    '701': ('conta expirada',
+            'a data de expiração da conta passou.'),
+    '773': ('precisa trocar a senha no próximo logon',
+            'é o padrão de toda conta recém-criada no AD, e o bind LDAP '
+            'simples não tem como trocar senha — então a conta nunca entra. '
+            'Peça para a pessoa trocar a senha no Windows (Ctrl+Alt+Del → '
+            'Alterar senha), ou desmarque "O usuário deve alterar a senha no '
+            'próximo logon" no console do AD.'),
+    '775': ('conta bloqueada por tentativas erradas',
+            'desbloqueie no console do AD ou aguarde o tempo de bloqueio.'),
+}
+
+
+def _motivo_da_recusa(resultado):
+    """Traduz a recusa de bind do AD em `(motivo, o_que_fazer, codigo)`.
+
+    `resultado` é o `Connection.result` do ldap3. Quando o servidor não é um
+    AD, ou o formato muda, caímos na descrição padrão do LDAP — perder o
+    detalhe é aceitável, deixar de responder não é.
+    """
+    import re
+
+    mensagem = str((resultado or {}).get('message') or '')
+    achado = re.search(r'data ([0-9a-fA-F]+)', mensagem)
+    if achado:
+        codigo = achado.group(1).lower()
+        if codigo in MOTIVOS_AD:
+            motivo, acao = MOTIVOS_AD[codigo]
+            return motivo, acao, codigo
+        return (f'recusado pelo AD (código {codigo})',
+                'código não catalogado; a mensagem completa está no log.',
+                codigo)
+
+    descricao = (resultado or {}).get('description') or 'motivo não informado'
+    return str(descricao), '', ''
+
 
 def _desescapar_rdn(valor):
     """Desfaz o escape de um valor de DN (RFC 4514).
@@ -182,11 +246,15 @@ def _servidor(com_info=False):
     )
 
 
-def _conectar(usuario_bind, senha_bind):
+def _conectar(usuario_bind, senha_bind, relatorio=None):
     """Abre a conexão e faz o bind.
 
     Devolve a `Connection`, ou None se a credencial foi recusada. Levanta
     `LdapIndisponivel` se o servidor não respondeu.
+
+    `relatorio` é um dicionário opcional que recebe o motivo da recusa, para o
+    `ldap_check` poder explicá-lo na tela. Fica opcional de propósito: o login
+    não precisa dele, e assim o caminho normal não muda.
     """
     from ldap3 import Connection
     from ldap3.core.exceptions import LDAPException
@@ -205,10 +273,14 @@ def _conectar(usuario_bind, senha_bind):
             conexao.open()
             conexao.start_tls()
         if not conexao.bind():
-            # Credencial recusada — o resultado traz o motivo do AD (senha
-            # errada, conta expirada, conta desabilitada...).
-            logger.info('LDAP: bind recusado para %s (%s)',
-                        usuario_bind, conexao.result.get('description'))
+            # Credencial recusada. O código LDAP é sempre `invalidCredentials`;
+            # o motivo de verdade está no texto de diagnóstico do AD.
+            motivo, acao, codigo = _motivo_da_recusa(conexao.result)
+            if relatorio is not None:
+                relatorio.update(motivo=motivo, acao=acao, codigo=codigo)
+            logger.info('LDAP: bind recusado para %s — %s%s',
+                        usuario_bind, motivo,
+                        f' (data {codigo})' if codigo else '')
             return None
         return conexao
     except LDAPException as erro:
@@ -240,10 +312,15 @@ def _montar_upn(username):
     return f'{username}@{dominio}' if dominio else username
 
 
-def _buscar_usuario(conexao, username):
+def _buscar_usuario(conexao, username, relatorio=None):
     """Procura a conta pelo `sAMAccountName`.
 
     Devolve `(atributos, dn)` ou `(None, '')`.
+
+    Quando não acha nada, registra no `relatorio` o que o servidor respondeu à
+    busca. "Não existe nesta base" e "você não tem permissão de ler" chegam
+    aqui como a mesma lista vazia, e a diferença é o que decide se o conserto
+    é em `LDAP_SEARCH_BASE` ou nas permissões do diretório.
     """
     from ldap3 import SUBTREE
 
@@ -255,6 +332,13 @@ def _buscar_usuario(conexao, username):
         attributes=ATRIBUTOS,
     )
     if not conexao.entries:
+        if relatorio is not None:
+            resultado = getattr(conexao, 'result', None) or {}
+            relatorio.update(
+                fora_da_base=True,
+                busca=str(resultado.get('description') or 'sem resultado'),
+                busca_mensagem=str(resultado.get('message') or ''),
+            )
         return None, ''
     entrada = conexao.entries[0]
     return entrada.entry_attributes_as_dict, str(entrada.entry_dn)
@@ -311,18 +395,24 @@ def _montar_usuario(entrada, dn, username, grupos=None):
     )
 
 
-def autenticar(username, password):
+def autenticar(username, password, relatorio=None):
     """Valida a credencial no AD e devolve um `UsuarioLdap`, ou None.
 
     None = credencial recusada ou conta não encontrada na base de busca.
     `LdapIndisponivel` = não foi possível falar com o servidor.
+
+    `relatorio` é um dicionário opcional preenchido com o motivo quando o
+    resultado é None. O login não o usa — quem usa é o `manage.py ldap_check`,
+    para explicar a recusa em vez de pedir que se leia o log. Passá-lo pelas
+    mesmas funções do login é de propósito: um diagnóstico que percorresse
+    outro caminho poderia dar certo justamente onde o login falha.
     """
     if not username or not password:
         # Bind com senha vazia é um **bind anônimo**, que o AD aceita — e a
         # autenticação "passaria" com a senha em branco. Barrado aqui.
         return None
 
-    conexao = _conectar(_montar_upn(username), password)
+    conexao = _conectar(_montar_upn(username), password, relatorio=relatorio)
     if conexao is None:
         return None
 
@@ -343,7 +433,7 @@ def autenticar(username, password):
                 raise LdapIndisponivel('credencial de serviço recusada')
             leitura = conexao_servico
 
-        entrada, dn = _buscar_usuario(leitura, username)
+        entrada, dn = _buscar_usuario(leitura, username, relatorio=relatorio)
         if entrada is None:
             # Bind passou mas não achamos a conta: base de busca errada, ou o
             # usuário está fora dela. Não é "senha errada" — por isso o aviso.
