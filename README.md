@@ -11,7 +11,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 ![DRF](https://img.shields.io/badge/DRF-3.18-A30000)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
 ![HTMX](https://img.shields.io/badge/HTMX-1.9-3366CC)
-![Testes](https://img.shields.io/badge/testes-356%20passando-brightgreen)
+![Testes](https://img.shields.io/badge/testes-361%20passando-brightgreen)
 
 ---
 
@@ -39,7 +39,7 @@ de ativos, API REST e autenticação integrada ao Active Directory.
 |---|---|
 | **Domínio** | ITSM / Service Desk corporativo |
 | **Código** | ~10.100 linhas de Python versionadas |
-| **Testes** | 356 automatizados, sem dependência de rede |
+| **Testes** | 361 automatizados, sem dependência de rede |
 | **Models** | 11 (chamado, comentário, anexo, escalonamento, aprovação, auditoria, ativo, notificação, perfil…) |
 | **Apps** | 7 (`accounts`, `tickets`, `cmdb`, `notifications`, `reports`, `dashboard`, `api`) |
 | **Autenticação** | sessão, token (API) e **Active Directory** via LDAP |
@@ -280,6 +280,10 @@ sistema. Decisões principais:
   exige uma decisão explícita, e o `manage.py check` passa a reclamar
 - Nenhuma credencial em arquivo versionado: tudo por variável de ambiente
 - Vem **desligado**, para quem clonar o projeto não travar no login
+- **Todo usuário do domínio entra como Solicitante** e abre chamado, sem
+  cadastro. Só `Domain Admins` concede papel automaticamente: mapear grupos
+  distribuídos por GPO daria privilégio de atendimento a quem só recebeu
+  acesso a uma pasta
 
 Diagnóstico sem adivinhação:
 
@@ -317,12 +321,12 @@ python manage.py test apps.tickets           # um app
 python manage.py test apps.accounts.tests_ldap
 ```
 
-**356 testes, nenhum dependendo de rede ou de serviço externo.**
+**361 testes, nenhum dependendo de rede ou de serviço externo.**
 
 | Módulo | Testes | Cobre |
 |---|---:|---|
 | `accounts` | 28 | RBAC, visibilidade, perfis |
-| `accounts` (LDAP) | 63 | mapeamento de grupos, provisionamento, cadeia de backends |
+| `accounts` (LDAP) | 67 | mapeamento de grupos, provisionamento, cadeia de backends |
 | `tickets` | 21 | CRUD, SLA, comentários, anexos |
 | `tickets` (fluxo) | 27 | finalizar, escalonar |
 | `tickets` (aprovação) | 34 | workflow, início do SLA |

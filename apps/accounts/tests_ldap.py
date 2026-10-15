@@ -624,6 +624,79 @@ class MapaDeGruposDoProjetoTests(TestCase):
                          UserProfile.ROLE_ADMIN)
 
 
+@override_settings(LDAP_ENABLED=True,
+                   LDAP_GROUP_ROLE_MAP=[('Domain Admins', 'admin')],
+                   LDAP_DEFAULT_ROLE=UserProfile.ROLE_REQUESTER)
+class DomainUsersAbreChamadoTests(TestCase):
+    """Quem está em `Domain Users` entra como Solicitante e abre chamado.
+
+    `Domain Users` é o grupo primário de **toda** conta do domínio: o AD a
+    coloca lá na criação e não dá para tirar. Então "todo usuário do domínio"
+    e "quem está em Domain Users" são o mesmo conjunto de pessoas.
+
+    Isto já é o comportamento do `LDAP_DEFAULT_ROLE`, e estes testes existem
+    para que continue sendo — inclusive o último, que mostra por que o grupo
+    **não** deve ser acrescentado ao `LDAP_GROUP_ROLE_MAP`.
+    """
+
+    def test_conta_so_em_domain_users_entra_como_solicitante(self):
+        with responder(usuario_ldap('maria', ['Domain Users'])):
+            user = LdapBackend().authenticate(None, username='maria',
+                                              password='qualquer')
+
+        self.assertIsNotNone(user, 'a conta do domínio deve conseguir entrar')
+        self.assertEqual(user.profile.role, UserProfile.ROLE_REQUESTER)
+        self.assertTrue(user.is_active)
+
+    def test_o_solicitante_do_ad_pode_abrir_chamado(self):
+        """O papel só serve se a pessoa chegar à tela de abrir chamado."""
+        with responder(usuario_ldap('maria', ['Domain Users'])):
+            user = LdapBackend().authenticate(None, username='maria',
+                                              password='qualquer')
+
+        self.client.force_login(user, backend='apps.accounts.ldap_backend.'
+                                              'LdapBackend')
+        resposta = self.client.get(reverse('tickets:create'))
+        self.assertEqual(resposta.status_code, 200)
+
+    def test_domain_users_com_domain_admins_sai_administrador(self):
+        """Estar nos dois não pode rebaixar o administrador do domínio."""
+        with responder(usuario_ldap('thiago', ['Domain Users',
+                                               'Domain Admins'])):
+            user = LdapBackend().authenticate(None, username='thiago',
+                                              password='qualquer')
+        self.assertEqual(user.profile.role, UserProfile.ROLE_ADMIN)
+
+    def test_domain_users_no_mapa_rebaixaria_o_tecnico_promovido_a_mao(self):
+        """A armadilha: por isso o grupo fica fora do `LDAP_GROUP_ROLE_MAP`.
+
+        Com o grupo no mapa, **toda** conta passa a casar, e casar sobrescreve
+        o papel. O Técnico promovido à mão em /admin/ voltaria a Solicitante no
+        login seguinte, e o ajuste manual deixaria de ser durável.
+
+        Fora do mapa (como está), ninguém casa, o papel atual é mantido, e a
+        conta nova cai no `LDAP_DEFAULT_ROLE` — que já é Solicitante.
+        """
+        criar_usuario('tecnico.ad', UserProfile.ROLE_TECHNICIAN)
+
+        # Como está hoje: o papel dado à mão sobrevive ao login pelo AD.
+        with responder(usuario_ldap('tecnico.ad', ['Domain Users'])):
+            user = LdapBackend().authenticate(None, username='tecnico.ad',
+                                              password='qualquer')
+        self.assertEqual(user.profile.role, UserProfile.ROLE_TECHNICIAN)
+
+        # E se alguém acrescentasse o grupo ao mapa:
+        with override_settings(LDAP_GROUP_ROLE_MAP=[
+                ('Domain Admins', 'admin'),
+                ('Domain Users',  'requester')]):
+            with responder(usuario_ldap('tecnico.ad', ['Domain Users'])):
+                user = LdapBackend().authenticate(None, username='tecnico.ad',
+                                                 password='qualquer')
+        self.assertEqual(user.profile.role, UserProfile.ROLE_REQUESTER,
+                         'se isto falhar, o rebaixamento deixou de acontecer '
+                         'e o aviso no settings pode ser revisto')
+
+
 class DivisaoDoNomeTests(TestCase):
     """`_dividir_nome` — o Django tem dois campos, o AD costuma ter um."""
 

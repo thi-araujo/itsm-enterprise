@@ -168,6 +168,27 @@ domínio. Vale saber do acoplamento: quem for adicionado a `Domain Admins` por
 um motivo de infraestrutura ganha o ITSM inteiro. Para desacoplar, esvazie o
 mapa — e aí até o primeiro administrador do ITSM é definido à mão.
 
+### `Domain Users` abre chamado — e não entra no mapa
+
+**Todo usuário do domínio já entra como Solicitante e já abre chamado.** Não
+há nada a configurar para isso: é o `LDAP_DEFAULT_ROLE`, que vale para quem
+autentica e não casa com nenhum grupo do mapa. Como `Domain Users` é o grupo
+primário de toda conta do AD — o diretório a coloca lá na criação, e não dá
+para tirar —, "quem está em `Domain Users`" e "todo mundo que tem conta no
+domínio" são o mesmo conjunto de pessoas.
+
+Acrescentar `('Domain Users', 'requester')` ao mapa parece dizer a mesma
+coisa, e **quebraria o passo 3 do fluxo acima.** Com o grupo no mapa, toda
+conta passa a casar; casar faz o diretório sobrescrever o papel; e o Técnico
+promovido à mão em /admin/ voltaria a Solicitante no login seguinte. O ajuste
+manual deixaria de ser durável — e o sintoma apareceria dias depois, como
+"o técnico perdeu o acesso à fila sozinho".
+
+Fora do mapa (como está), ninguém casa: quem é novo cai no `LDAP_DEFAULT_ROLE`
+e quem já tem papel o mantém. Os dois comportamentos ficam travados por
+`DomainUsersAbreChamadoTests`, inclusive o rebaixamento — um teste mostra que
+ele aconteceria, para o motivo não se perder.
+
 ## Conferir as contas em massa
 
 ```powershell
@@ -340,7 +361,7 @@ O `ldap_check --user` avisa quando a conta está sem eles:
 
 ## Testes
 
-63 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
+67 testes em `apps/accounts/tests_ldap.py`, nenhum deles tocando a rede. Duas
 estratégias:
 
 1. A maioria substitui `ldap_backend.autenticar` por uma função falsa e

@@ -423,7 +423,14 @@ total 1 contra 13 da equipe.
       massa: mostra o que o ITSM leria de cada uma e o papel resultante,
       usando as mesmas funções do login. Exclui contas de computador, que no
       AD também têm `objectClass=user`
-- [x] 63 testes novos — suíte total: **356 testes**
+- [x] **`Domain Users` → Solicitante**: todo usuário do domínio entra e abre
+      chamado pelo `LDAP_DEFAULT_ROLE`, sem configuração. O grupo **não** foi
+      acrescentado ao `LDAP_GROUP_ROLE_MAP` de propósito: ele casaria com
+      *toda* conta, e casar sobrescreve o papel — o Técnico promovido à mão
+      em /admin/ voltaria a Solicitante no login seguinte. 4 testes
+      (`DomainUsersAbreChamadoTests`) travam isso, um deles demonstrando o
+      rebaixamento que o acréscimo causaria
+- [x] 67 testes novos — suíte total: **361 testes**
 
 **Migração:** `accounts.0003_userprofile_from_ldap_userprofile_ldap_last_sync`.
 
