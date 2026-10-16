@@ -127,6 +127,45 @@ A senha normal da conta **é recusada**. É obrigatório:
 testar agora. Para uso corporativo de verdade, o Google Workspace com um
 domínio próprio é o equivalente ao Microsoft 365.
 
+A senha de app é mostrada em quatro grupos de quatro letras
+(`abcd efgh ijkl mnop`). **Cole sem os espaços** — com eles o valor fica com
+19 caracteres e a autenticação é recusada.
+
+#### Quando a porta 587 está bloqueada
+
+Verificado nesta instalação (16/10/2026): a rede **bloqueia a 587 de saída** e
+deixa a 465 passar. O sintoma é `TimeoutError: timed out` dentro de
+`socket.create_connection` — a conexão TCP nem abre, então não há diálogo SMTP
+nenhum. Senha errada daria `535 Username and Password not accepted`, bem
+diferente.
+
+Para separar a rede do resto:
+
+```powershell
+Test-NetConnection smtp.gmail.com -Port 587
+Test-NetConnection smtp.gmail.com -Port 465
+```
+
+`TcpTestSucceeded : False` significa bloqueio antes de sair da máquina —
+firewall local, antivírus ou o provedor. A 587 e a 25 são as portas
+historicamente usadas por malware para enviar spam, e são as primeiras a ser
+filtradas.
+
+A saída é trocar **só a porta** no `.env`:
+
+```ini
+ITSM_EMAIL_PORT=465
+```
+
+Nada mais muda: `EMAIL_USE_SSL` e `EMAIL_USE_TLS` são derivados da porta no
+`settings.py`. Não defina `ITSM_EMAIL_USE_TLS` nem `ITSM_EMAIL_USE_SSL` à mão —
+ligar os dois é o `email.E001`.
+
+As duas portas são seguras, de formas diferentes: a 587 conecta em claro e
+**sobe** para TLS com o comando `STARTTLS`; a 465 já **nasce** cifrada (SSL
+implícito). A 465 chegou a ser considerada obsoleta e foi reabilitada como
+padrão. Nenhuma das duas manda a senha em claro.
+
 ## Testar o envio
 
 O Django tem um comando pronto para isso — não precisa abrir chamado:
@@ -144,6 +183,19 @@ diagnosticar.
 
 Depois, o teste de ponta a ponta: abra um chamado com um usuário que tenha
 endereço cadastrado e confira a caixa de entrada.
+
+### Mexeu no `.env`? Reinicie o `runserver`
+
+Variável de ambiente é lida **uma vez**, quando o processo nasce. O autoreload
+do Django observa arquivos `.py` — o `.env` não é um deles, então editá-lo não
+reinicia nada e o servidor continua com a configuração antiga.
+
+Foi o que aconteceu aqui: a porta já estava corrigida para 465 no arquivo, o
+`sendtestemail` (processo novo) enviava, e o chamado aberto pela tela falhava
+com `TimeoutError` — o `runserver` em pé desde antes ainda usava a 587. Ctrl+C
+e subir de novo resolve.
+
+O mesmo vale para as variáveis `ITSM_LDAP_*`.
 
 ## Avisos do `manage.py check`
 

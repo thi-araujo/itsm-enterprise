@@ -554,8 +554,33 @@ conta do AD, com prazo correto (16/10/2026 02:24); `manage.py check` emitindo
 > saída exige OAuth2, conector de retransmissão ou Graph API. Ver
 > `docs/EMAIL.md`.
 
+**SMTP ligado e entregando (16/10/2026).** Gmail com senha de app, na porta
+**465** — a rede daqui bloqueia a 587 de saída (`TcpTestSucceeded : False`,
+e `TimeoutError` dentro de `socket.create_connection`, antes de qualquer
+diálogo SMTP). Só a porta mudou no `.env`: `EMAIL_USE_SSL` e `EMAIL_USE_TLS`
+são derivados dela. `manage.py check` sem nenhum aviso de e-mail, conexão
+autenticada no servidor do Google, `sendtestemail` entregue, e o recibo de
+abertura chegando num chamado aberto pela tela.
+
+Duas armadilhas encontradas no caminho, ambas documentadas em `docs/EMAIL.md`:
+
+1. **A senha de app colada com os espaços** dos grupos de quatro (19
+   caracteres em vez de 16) — recusada.
+2. **O `.env` editado com o `runserver` em pé.** Variável de ambiente é lida
+   no nascimento do processo, e o autoreload só observa arquivos `.py`. O
+   `sendtestemail` (processo novo) enviava e a tela falhava, com a porta
+   antiga ainda em memória. Ctrl+C e subir de novo.
+
 ### Pendência desta fase
 - O envio é **síncrono**, dentro da requisição. Em volume maior o caminho é
   Celery, chamando as mesmas funções de `email.py`.
 - Os links no corpo das mensagens estão cravados em `http://localhost:8000`.
   Em uso real precisam virar o endereço do servidor.
+- **Contas do AD sem o atributo `mail`** não recebem e-mail nenhum — a guarda
+  de `notify_ticket_opened` sai antes de tentar, em silêncio. Hoje são
+  `davi.araujo` e `cassia.araujo`. O conserto é preencher no diretório (o
+  próximo login atualiza sozinho), não no `/admin/`, que o AD sobrescreve.
+  `ldap_check --user <conta> --list` mostra quem está sem.
+- Os endereços `@araujo.corp` são do domínio interno e não existem na
+  internet: o Gmail aceita no `RCPT TO` e devolve "não entregue" depois. Com
+  um SMTP do domínio real, ou o relay interno, eles entregam.
